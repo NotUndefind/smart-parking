@@ -1,0 +1,17 @@
+{
+    "name": "julesbourin/code",
+    "autoload": {
+        "psr-4": {
+            "Julesbourin\\Code\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "NotUndefind",
+            "email": "julesbourin@icloud.com"
+        }
+    ],
+    "require-dev": {
+        "phpunit/phpunit": "^12.4"
+    }
+}

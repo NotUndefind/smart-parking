@@ -1,0 +1,26 @@
+# Dépendances
+/vendor/
+
+# Configuration
+.env
+/config/database.php
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs et cache
+/storage/logs/*.log
+/storage/invoices/*.pdf
+
+# Tests
+/coverage/
+
+# Data (si fichiers JSON)
+/data/*.json
