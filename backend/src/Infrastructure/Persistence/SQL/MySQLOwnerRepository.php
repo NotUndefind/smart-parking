@@ -2,11 +2,11 @@
 
 namespace Infrastructure\Persistence\SQL;
 
-use Domain\Repositories\UserRepositoryInterface;
-use Domain\Entities\User;
+use Domain\Repositories\OwnerRepositoryInterface;
+use Domain\Entities\Owner;
 use PDO;
 
-class MySQLUserRepository implements UserRepositoryInterface
+class MySQLOwnerRepository implements OwnerRepositoryInterface
 {
     private PDO $pdo;
 
@@ -15,15 +15,15 @@ class MySQLUserRepository implements UserRepositoryInterface
         $this->pdo = $pdo;
     }
 
-    public function save(User $user): void
+    public function save(Owner $owner): void
     {
-        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE id = :id");
-        $stmt->execute(['id' => $user->getId()]);
+        $stmt = $this->pdo->prepare("SELECT id FROM owners WHERE id = :id");
+        $stmt->execute(['id' => $owner->getId()]);
         $exists = $stmt->fetch();
 
         if ($exists) {
             $stmt = $this->pdo->prepare("
-                UPDATE users 
+                UPDATE owners 
                 SET email = :email, 
                     password = :password, 
                     nom = :nom, 
@@ -32,24 +32,24 @@ class MySQLUserRepository implements UserRepositoryInterface
             ");
         } else {
             $stmt = $this->pdo->prepare("
-                INSERT INTO users (id, email, password, nom, prenom, created_at)
+                INSERT INTO owners (id, email, password, nom, prenom, created_at)
                 VALUES (:id, :email, :password, :nom, :prenom, NOW())
             ");
         }
 
         $stmt->execute([
-            'id' => $user->getId(),
-            'email' => $user->getEmail(),
-            'password' => $user->getPassword(),
-            'nom' => $user->getNom(),
-            'prenom' => $user->getPrenom()
+            'id' => $owner->getId(),
+            'email' => $owner->getEmail(),
+            'password' => $owner->getPassword(),
+            'nom' => $owner->getNom(),
+            'prenom' => $owner->getPrenom()
         ]);
     }
 
-    public function findById(string $id): ?User
+    public function findById(string $id): ?Owner
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM users WHERE id = :id
+            SELECT * FROM owners WHERE id = :id
         ");
         $stmt->execute(['id' => $id]);
         $data = $stmt->fetch();
@@ -61,10 +61,10 @@ class MySQLUserRepository implements UserRepositoryInterface
         return $this->hydrate($data);
     }
 
-    public function findByEmail(string $email): ?User
+    public function findByEmail(string $email): ?Owner
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM users WHERE email = :email
+            SELECT * FROM owners WHERE email = :email
         ");
         $stmt->execute(['email' => $email]);
         $data = $stmt->fetch();
@@ -78,21 +78,21 @@ class MySQLUserRepository implements UserRepositoryInterface
 
     public function delete(string $id): void
     {
-        $stmt = $this->pdo->prepare("DELETE FROM users WHERE id = :id");
+        $stmt = $this->pdo->prepare("DELETE FROM owners WHERE id = :id");
         $stmt->execute(['id' => $id]);
     }
 
     public function findAll(): array
     {
-        $stmt = $this->pdo->query("SELECT * FROM users ORDER BY created_at DESC");
+        $stmt = $this->pdo->query("SELECT * FROM owners ORDER BY created_at DESC");
         $data = $stmt->fetchAll();
 
         return array_map(fn($row) => $this->hydrate($row), $data);
     }
 
-    private function hydrate(array $data): User
+    private function hydrate(array $data): Owner
     {
-        return new User(
+        return new Owner(
             id: $data['id'],
             email: $data['email'],
             password: $data['password'],
@@ -101,5 +101,3 @@ class MySQLUserRepository implements UserRepositoryInterface
         );
     }
 }
-
-
