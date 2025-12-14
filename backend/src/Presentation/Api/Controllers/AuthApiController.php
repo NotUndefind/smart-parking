@@ -1,136 +1,84 @@
 <?php
 
-namespace Presentation\Api\Controllers;
+declare(strict_types=1);
 
-// use Application\UseCases\Auth\RegisterUserUseCase;
-// use Application\UseCases\Auth\RegisterOwnerUseCase;
-// use Application\UseCases\Auth\LoginUseCase;
+namespace App\Presentation\Api\Controllers;
 
-// use Application\DTOs\Input\RegisterUserInput;
-// use Application\DTOs\Input\RegisterOwnerInput;
-// use Application\DTOs\Input\LoginInput;
-// use Application\DTOs\Output\AuthTokenOutput;
+use App\Application\DTOs\Input\AuthenticateUserInput;
+use App\Application\DTOs\Input\RegisterUserInput;
+use App\Application\UseCases\Auth\AuthenticateUserUseCase;
+use App\Application\UseCases\Auth\RegisterUserUseCase;
 
-class AuthApiController
+final class AuthApiController
 {
-    // TODO: Injecter les Use Cases via le constructeur
-    // private RegisterUserUseCase $registerUserUseCase;
-    // private RegisterOwnerUseCase $registerOwnerUseCase;
-    // private LoginUseCase $loginUseCase;
-
-    public function __construct()
-    {
-        // TODO: Injection de dépendances
-        // $this->registerUserUseCase = $registerUserUseCase;
-        // $this->registerOwnerUseCase = $registerOwnerUseCase;
-        // $this->loginUseCase = $loginUseCase;
-    }
-    public function registerUser(): void
-    {
-        try {
-            $data = json_decode(file_get_contents('php://input'), true);
-
-            if (!isset($data['email']) || !isset($data['password']) || 
-                !isset($data['nom']) || !isset($data['prenom'])) {
-                $this->jsonResponse(['error' => 'Données manquantes'], 400);
-                return;
-            }
-            // $input = new RegisterUserInput(
-            //     email: $data['email'],
-            //     password: $data['password'],
-            //     nom: $data['nom'],
-            //     prenom: $data['prenom']
-            // );
-
-            // $output = $this->registerUserUseCase->execute($input);
-
-            // $this->jsonResponse([
-            //     'success' => true,
-            //     'user' => [
-            //         'id' => $output->id,
-            //         'email' => $output->email,
-            //         'nom' => $output->nom,
-            //         'prenom' => $output->prenom
-            //     ],
-            //     'token' => $output->token
-            // ], 201);
-
-            // Temporaire (en attendant les Use Cases)
-            $this->jsonResponse([
-                'message' => 'Endpoint prêt - En attente du Use Case RegisterUserUseCase'
-            ], 501);
-
-        } catch (\Exception $e) {
-            $this->jsonResponse(['error' => $e->getMessage()], 500);
-        }
+    public function __construct(
+        private RegisterUserUseCase $registerUserUseCase,
+        private AuthenticateUserUseCase $authenticateUserUseCase
+    ) {
     }
 
-    public function registerOwner(): void
+    public function register(): void
     {
-        try {
-            $data = json_decode(file_get_contents('php://input'), true);
+        header('Content-Type: application/json');
 
-            if (!isset($data['email']) || !isset($data['password']) || 
-                !isset($data['nom']) || !isset($data['prenom'])) {
-                $this->jsonResponse(['error' => 'Données manquantes'], 400);
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            if (!isset($input['email'], $input['password'], $input['first_name'], $input['last_name'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing required fields']);
                 return;
             }
 
-            // TODO: Créer Input DTO et appeler Use Case
-            // $input = new RegisterOwnerInput(...);
-            // $output = $this->registerOwnerUseCase->execute($input);
+            $registerInput = new RegisterUserInput(
+                email: $input['email'],
+                password: $input['password'],
+                firstName: $input['first_name'],
+                lastName: $input['last_name']
+            );
 
-            $this->jsonResponse([
-                'message' => 'Endpoint prêt - En attente du Use Case RegisterOwnerUseCase'
-            ], 501);
+            $output = $this->registerUserUseCase->execute($registerInput);
 
+            http_response_code(201);
+            echo json_encode($output->toArray());
+        } catch (\InvalidArgumentException $e) {
+            http_response_code(400);
+            echo json_encode(['error' => $e->getMessage()]);
         } catch (\Exception $e) {
-            $this->jsonResponse(['error' => $e->getMessage()], 500);
+            http_response_code(500);
+            echo json_encode(['error' => 'Internal server error']);
         }
     }
 
     public function login(): void
     {
-        try {
-            $data = json_decode(file_get_contents('php://input'), true);
+        header('Content-Type: application/json');
 
-            if (!isset($data['email']) || !isset($data['password'])) {
-                $this->jsonResponse(['error' => 'Email et mot de passe requis'], 400);
+        try {
+            $input = json_decode(file_get_contents('php://input'), true);
+
+            if (!isset($input['email'], $input['password'])) {
+                http_response_code(400);
+                echo json_encode(['error' => 'Missing email or password']);
                 return;
             }
 
-            // TODO: Créer Input DTO et appeler Use Case
-            // $input = new LoginInput(
-            //     email: $data['email'],
-            //     password: $data['password']
-            // );
-            // $output = $this->loginUseCase->execute($input);
+            $authInput = new AuthenticateUserInput(
+                email: $input['email'],
+                password: $input['password']
+            );
 
-            // TODO: Retourner token JWT
-            // $this->jsonResponse([
-            //     'success' => true,
-            //     'token' => $output->token,
-            //     'user' => [
-            //         'id' => $output->userId,
-            //         'email' => $output->email,
-            //         'role' => $output->role // 'user' ou 'owner'
-            //     ]
-            // ], 200);
+            $output = $this->authenticateUserUseCase->execute($authInput);
 
-            $this->jsonResponse([
-                'message' => 'Endpoint prêt - En attente du Use Case LoginUseCase'
-            ], 501);
-
+            http_response_code(200);
+            echo json_encode($output->toArray());
+        } catch (\App\Domain\Exceptions\InvalidCredentialsException $e) {
+            http_response_code(401);
+            echo json_encode(['error' => $e->getMessage()]);
         } catch (\Exception $e) {
-            $this->jsonResponse(['error' => $e->getMessage()], 500);
+            http_response_code(500);
+            echo json_encode(['error' => 'Internal server error']);
         }
     }
-    private function jsonResponse(array $data, int $statusCode = 200): void
-    {
-        http_response_code($statusCode);
-        header('Content-Type: application/json');
-        echo json_encode($data, JSON_UNESCAPED_UNICODE);
-    }
 }
-
 

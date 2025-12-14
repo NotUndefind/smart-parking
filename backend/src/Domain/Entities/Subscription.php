@@ -1,35 +1,62 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Entities;
 
-class Subscription
+/**
+ * Entité Subscription - Logique métier pure
+ */
+final class Subscription
 {
-    private int $id;
-    private User $user;
-    private Parking $parking;
-    private string $type;
+    private string $id;
+    private string $parkingId;
+    private string $userId;
+    private string $type; // 'daily', 'weekly', 'monthly', 'yearly'
     private float $price;
-    private int $duration; // Duration in months
-    private array $timeSlots; // Array of TimeSlot entities
+    private int $startDate;
+    private int $endDate;
+    private bool $isActive;
+    private \DateTimeImmutable $createdAt;
+    private ?\DateTimeImmutable $updatedAt;
 
     public function __construct(
-        int $id,
+        string $id,
+        string $parkingId,
+        string $userId,
         string $type,
         float $price,
-        int $duration,
-        array $timeSlots = [],
+        int $startDate,
+        int $endDate,
+        bool $isActive = true,
+        ?\DateTimeImmutable $createdAt = null,
+        ?\DateTimeImmutable $updatedAt = null
     ) {
         $this->id = $id;
+        $this->parkingId = $parkingId;
+        $this->userId = $userId;
         $this->type = $type;
         $this->price = $price;
-        $this->duration = $duration;
-        $this->timeSlots = $timeSlots;
+        $this->startDate = $startDate;
+        $this->endDate = $endDate;
+        $this->isActive = $isActive;
+        $this->createdAt = $createdAt ?? new \DateTimeImmutable();
+        $this->updatedAt = $updatedAt;
     }
 
-    // Getter methods
-    public function getId(): int
+    public function getId(): string
     {
         return $this->id;
+    }
+
+    public function getParkingId(): string
+    {
+        return $this->parkingId;
+    }
+
+    public function getUserId(): string
+    {
+        return $this->userId;
     }
 
     public function getType(): string
@@ -42,29 +69,40 @@ class Subscription
         return $this->price;
     }
 
-    public function getDuration(): int
+    public function getStartDate(): int
     {
-        return $this->duration;
+        return $this->startDate;
     }
 
-    // Update methods
-    public function updateType(string $type): void
+    public function getEndDate(): int
     {
-        $this->type = $type;
+        return $this->endDate;
     }
 
-    public function updatePrice(float $price): void
+    public function isActive(): bool
     {
-        $this->price = $price;
+        return $this->isActive;
     }
 
-    public function updateDuration(int $duration): void
+    public function getCreatedAt(): \DateTimeImmutable
     {
-        $this->duration = $duration;
+        return $this->createdAt;
     }
 
-    public function updateTimeSlots(array $timeSlots): void
+    public function getUpdatedAt(): ?\DateTimeImmutable
     {
-        $this->timeSlots = $timeSlots;
+        return $this->updatedAt;
+    }
+
+    public function isValidAt(int $timestamp): bool
+    {
+        return $this->isActive && $timestamp >= $this->startDate && $timestamp <= $this->endDate;
+    }
+
+    public function deactivate(): void
+    {
+        $this->isActive = false;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 }
+

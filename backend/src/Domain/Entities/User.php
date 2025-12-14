@@ -1,41 +1,41 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Domain\Entities;
 
-class User
+/**
+ * Entité User - Logique métier pure, aucune dépendance externe
+ */
+final class User
 {
-    private int $id;
+    private string $id;
     private string $email;
-    private string $password;
+    private string $passwordHash;
     private string $firstName;
     private string $lastName;
-
-    /**
-     * @var Reservation[]
-     */
-    private array $reservations = []; // Association to Reservation entity
-
-    /**
-     * @var ParkingSpot[]
-     */
-    private array $parkingSpots; // Association to ParkingSpot entity
+    private \DateTimeImmutable $createdAt;
+    private ?\DateTimeImmutable $updatedAt;
 
     public function __construct(
-        int $id,
+        string $id,
         string $email,
-        string $password,
+        string $passwordHash,
         string $firstName,
         string $lastName,
+        ?\DateTimeImmutable $createdAt = null,
+        ?\DateTimeImmutable $updatedAt = null
     ) {
         $this->id = $id;
         $this->email = $email;
-        $this->password = $password;
+        $this->passwordHash = $passwordHash;
         $this->firstName = $firstName;
         $this->lastName = $lastName;
+        $this->createdAt = $createdAt ?? new \DateTimeImmutable();
+        $this->updatedAt = $updatedAt;
     }
 
-    // Getter methods
-    public function getId(): int
+    public function getId(): string
     {
         return $this->id;
     }
@@ -45,9 +45,9 @@ class User
         return $this->email;
     }
 
-    public function getPassword(): string
+    public function getPasswordHash(): string
     {
-        return $this->password;
+        return $this->passwordHash;
     }
 
     public function getFirstName(): string
@@ -62,37 +62,30 @@ class User
 
     public function getFullName(): string
     {
-        return $this->firstName . " " . $this->lastName;
+        return $this->firstName . ' ' . $this->lastName;
     }
 
-    // Update methods
-    public function updatePassword(string $newPassword): void
+    public function getCreatedAt(): \DateTimeImmutable
     {
-        $this->password = $newPassword;
+        return $this->createdAt;
     }
 
-    public function updateEmail(string $newEmail): void
+    public function getUpdatedAt(): ?\DateTimeImmutable
     {
-        $this->email = $newEmail;
+        return $this->updatedAt;
     }
 
-    public function updateFirstName(string $newFirstName): void
+    public function updatePassword(string $newPasswordHash): void
     {
-        $this->firstName = $newFirstName;
+        $this->passwordHash = $newPasswordHash;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 
-    public function updateLastName(string $newLastName): void
+    public function updateProfile(string $firstName, string $lastName): void
     {
-        $this->lastName = $newLastName;
-    }
-
-    public function getReservations(): array
-    {
-        return $this->reservations;
-    }
-
-    public function getParkingSpots(): array
-    {
-        return $this->parkingSpots;
+        $this->firstName = $firstName;
+        $this->lastName = $lastName;
+        $this->updatedAt = new \DateTimeImmutable();
     }
 }
+

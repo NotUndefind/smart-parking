@@ -1,56 +1,59 @@
 <?php
 
-namespace Infrastructure\Persistence\File;
+declare(strict_types=1);
 
-use Domain\Repositories\UserRepositoryInterface;
-use Domain\Entities\User;
+namespace App\Infrastructure\Persistence\File;
 
-class FileUserRepository implements UserRepositoryInterface
+use App\Domain\Entities\User;
+use App\Domain\Repositories\UserRepositoryInterface;
+
+final class FileUserRepository implements UserRepositoryInterface
 {
-    private string $filePath;
+    private string $dataDir;
 
-    public function __construct(string $dataDirectory)
+    public function __construct(string $dataDir = __DIR__ . '/../../../data/users')
     {
-        $this->filePath = rtrim($dataDirectory, '/') . '/users.json';
-        $this->ensureFileExists();
+        $this->dataDir = $dataDir;
+        if (!is_dir($this->dataDir)) {
+            mkdir($this->dataDir, 0755, true);
+        }
     }
 
     public function save(User $user): void
     {
-        $users = $this->loadAll();
-        $users[$user->getId()] = [
+        $filePath = $this->getFilePath($user->getId());
+        $data = [
             'id' => $user->getId(),
             'email' => $user->getEmail(),
-            'password' => $user->getPassword(),
-            'nom' => $user->getNom(),
-            'prenom' => $user->getPrenom(),
-            'created_at' => $users[$user->getId()]['created_at'] ?? date('Y-m-d H:i:s')
+            'password_hash' => $user->getPasswordHash(),
+            'first_name' => $user->getFirstName(),
+            'last_name' => $user->getLastName(),
+            'created_at' => $user->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at' => $user->getUpdatedAt()?->format('Y-m-d H:i:s'),
         ];
-
-        $this->saveAll($users);
+        file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT));
     }
 
     public function findById(string $id): ?User
     {
-        $users = $this->loadAll();
-
-        if (!isset($users[$id])) {
+        $filePath = $this->getFilePath($id);
+        if (!file_exists($filePath)) {
             return null;
         }
 
-        return $this->hydrate($users[$id]);
+        $data = json_decode(file_get_contents($filePath), true);
+        return $data ? $this->hydrate($data) : null;
     }
 
     public function findByEmail(string $email): ?User
     {
-        $users = $this->loadAll();
-
-        foreach ($users as $userData) {
-            if ($userData['email'] === $email) {
-                return $this->hydrate($userData);
+        $files = glob($this->dataDir . '/*.json');
+        foreach ($files as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if ($data && $data['email'] === $email) {
+                return $this->hydrate($data);
             }
         }
-
         return null;
     }
 
@@ -93,6 +96,15 @@ class FileUserRepository implements UserRepositoryInterface
         if (!file_exists($this->filePath)) {
             file_put_contents($this->filePath, json_encode([]), LOCK_EX);
         }
+        $filePath = $this->getFilePath($id);
+        if (file_exists($filePath)) {
+            unlink($filePath);
+        }
+    }
+
+    private function getFilePath(string $id): string
+    {
+        return $this->dataDir . '/' . $id . '.json';
     }
 
     private function hydrate(array $data): User
@@ -100,9 +112,12 @@ class FileUserRepository implements UserRepositoryInterface
         return new User(
             id: $data['id'],
             email: $data['email'],
-            password: $data['password'],
-            nom: $data['nom'],
-            prenom: $data['prenom']
+            passwordHash: $data['password_hash'],
+            firstName: $data['first_name'],
+            lastName: $data['last_name'],
+            createdAt: new \DateTimeImmutable($data['created_at']),
+            updatedAt: $data['updated_at'] ? new \DateTimeImmutable($data['updated_at']) : null
         );
     }
 }
+
