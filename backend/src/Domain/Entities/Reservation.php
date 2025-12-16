@@ -26,9 +26,9 @@ final class Reservation
         int $startTime,
         int $endTime,
         float $estimatedPrice,
-        string $status = 'active',
+        string $status = "active",
         ?\DateTimeImmutable $createdAt = null,
-        ?\DateTimeImmutable $updatedAt = null
+        ?\DateTimeImmutable $updatedAt = null,
     ) {
         $this->id = $id;
         $this->userId = $userId;
@@ -88,22 +88,24 @@ final class Reservation
 
     public function cancel(): void
     {
-        if ($this->status === 'completed') {
-            throw new \RuntimeException('Cannot cancel a completed reservation');
+        if ($this->status === "completed") {
+            throw new \RuntimeException(
+                "Cannot cancel a completed reservation",
+            );
         }
-        $this->status = 'cancelled';
+        $this->status = "cancelled";
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function complete(): void
     {
-        $this->status = 'completed';
+        $this->status = "completed";
         $this->updatedAt = new \DateTimeImmutable();
     }
 
     public function isActive(): bool
     {
-        return $this->status === 'active';
+        return $this->status === "active";
     }
 
     public function isOverlapping(int $startTime, int $endTime): bool
@@ -111,4 +113,3 @@ final class Reservation
         return !($this->endTime <= $startTime || $this->startTime >= $endTime);
     }
 }
-

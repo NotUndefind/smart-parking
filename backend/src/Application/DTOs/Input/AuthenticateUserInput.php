@@ -6,10 +6,13 @@ namespace App\Application\DTOs\Input;
 
 final class AuthenticateUserInput
 {
-    public function __construct(
+    private function __construct(
         public readonly string $email,
-        public readonly string $password
-    ) {
+        public readonly string $password,
+    ) {}
+
+    public static function create(string $email, string $password): self
+    {
+        return new self(email: $email, password: $password);
     }
 }
-
