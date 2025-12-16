@@ -6,12 +6,14 @@ namespace App\Application\UseCases\User;
 
 use App\Application\DTOs\Input\SearchParkingsByLocationInput;
 use App\Application\DTOs\Output\ParkingOutput;
+use App\Application\Validators\GPSCoordinatesValidator;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 
 final class SearchParkingsByLocationUseCase
 {
     public function __construct(
-        private ParkingRepositoryInterface $parkingRepository
+        private ParkingRepositoryInterface $parkingRepository,
+        private GPSCoordinatesValidator $gpsCoordinatesValidator
     ) {
     }
 
@@ -20,6 +22,10 @@ final class SearchParkingsByLocationUseCase
      */
     public function execute(SearchParkingsByLocationInput $input): array
     {
+        // 1. Validation des coordonnées GPS
+        $this->gpsCoordinatesValidator->validate($input->latitude, $input->longitude);
+
+        // 2. Recherche des parkings
         $parkings = $this->parkingRepository->findByLocation(
             $input->latitude,
             $input->longitude,

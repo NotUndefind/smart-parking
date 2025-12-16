@@ -8,8 +8,12 @@ use App\Application\UseCases\Auth\AuthenticateUserUseCase;
 use App\Application\UseCases\Auth\RegisterUserUseCase;
 use App\Application\UseCases\Owner\AuthenticateOwnerUseCase;
 use App\Application\UseCases\Owner\RegisterOwnerUseCase;
+use App\Application\UseCases\User\CreateReservationUseCase;
+use App\Application\UseCases\User\SearchParkingsByLocationUseCase;
 use App\Application\Validators\EmailValidator;
+use App\Application\Validators\GPSCoordinatesValidator;
 use App\Application\Validators\PasswordValidator;
+use App\Application\Validators\TimeSlotValidator;
 use App\Infrastructure\Persistence\File\FileOwnerRepository;
 use App\Infrastructure\Persistence\File\FileUserRepository;
 use App\Infrastructure\Persistence\SQL\MySQLOwnerRepository;
@@ -47,6 +51,8 @@ if ($storageType === 'sql') {
 // Validators
 $emailValidator = new EmailValidator();
 $passwordValidator = new PasswordValidator();
+$gpsValidator = new GPSCoordinatesValidator();
+$timeSlotValidator = new TimeSlotValidator();
 
 // Use Cases Utilisateur
 $registerUserUseCase = new RegisterUserUseCase(
@@ -60,6 +66,19 @@ $authenticateUserUseCase = new AuthenticateUserUseCase(
     userRepository: $userRepository,
     passwordHasher: $passwordHasher,
     jwtService: $jwtService
+);
+
+// Use Cases Utilisateur - Recherche & Réservations (exemples pour injection)
+$searchParkingsByLocationUseCase = new SearchParkingsByLocationUseCase(
+    parkingRepository: $parkingRepository ?? new \App\Infrastructure\Persistence\File\FileParkingRepository(),
+    gpsCoordinatesValidator: $gpsValidator
+);
+
+$createReservationUseCase = new CreateReservationUseCase(
+    userRepository: $userRepository,
+    parkingRepository: $parkingRepository ?? new \App\Infrastructure\Persistence\File\FileParkingRepository(),
+    reservationRepository: $reservationRepository ?? new \App\Infrastructure\Persistence\File\FileReservationRepository(),
+    timeSlotValidator: $timeSlotValidator
 );
 
 // Use Cases Propriétaire
