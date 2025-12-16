@@ -1,18 +1,17 @@
 <?php
 
-namespace Infrastructure\Persistence\SQL;
+declare(strict_types=1);
 
-use Domain\Repositories\ReservationRepositoryInterface;
-use Domain\Entities\Reservation;
+namespace App\Infrastructure\Persistence\SQL;
+
+use App\Domain\Repositories\ReservationRepositoryInterface;
+use App\Domain\Entities\Reservation;
 use PDO;
 
-class MySQLReservationRepository implements ReservationRepositoryInterface
+final class MySQLReservationRepository implements ReservationRepositoryInterface
 {
-    private PDO $pdo;
-
-    public function __construct(PDO $pdo)
+    public function __construct(private PDO $pdo)
     {
-        $this->pdo = $pdo;
     }
 
     public function save(Reservation $reservation): void
@@ -23,7 +22,7 @@ class MySQLReservationRepository implements ReservationRepositoryInterface
 
         if ($exists) {
             $stmt = $this->pdo->prepare("
-                UPDATE reservations 
+                UPDATE reservations
                 SET user_id = :user_id,
                     parking_id = :parking_id,
                     debut = :debut,
@@ -43,10 +42,10 @@ class MySQLReservationRepository implements ReservationRepositoryInterface
             'id' => $reservation->getId(),
             'user_id' => $reservation->getUserId(),
             'parking_id' => $reservation->getParkingId(),
-            'debut' => $reservation->getDebut(),
-            'fin' => $reservation->getFin(),
-            'prix_estime' => $reservation->getPrixEstime(),
-            'statut' => $reservation->getStatut()
+            'debut' => $reservation->getStartTime(),
+            'fin' => $reservation->getEndTime(),
+            'prix_estime' => $reservation->getEstimatedPrice(),
+            'statut' => $reservation->getStatus()
         ]);
     }
 
@@ -66,8 +65,8 @@ class MySQLReservationRepository implements ReservationRepositoryInterface
     public function findActiveByParking(string $parkingId, int $debut, int $fin): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM reservations 
-            WHERE parking_id = :parking_id 
+            SELECT * FROM reservations
+            WHERE parking_id = :parking_id
             AND statut = 'active'
             AND NOT (fin <= :debut OR debut >= :fin)
             ORDER BY debut ASC
@@ -87,8 +86,8 @@ class MySQLReservationRepository implements ReservationRepositoryInterface
     public function findByUserId(string $userId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM reservations 
-            WHERE user_id = :user_id 
+            SELECT * FROM reservations
+            WHERE user_id = :user_id
             ORDER BY debut DESC
         ");
         $stmt->execute(['user_id' => $userId]);
@@ -100,8 +99,8 @@ class MySQLReservationRepository implements ReservationRepositoryInterface
     public function findByParkingId(string $parkingId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM reservations 
-            WHERE parking_id = :parking_id 
+            SELECT * FROM reservations
+            WHERE parking_id = :parking_id
             ORDER BY debut DESC
         ");
         $stmt->execute(['parking_id' => $parkingId]);
@@ -116,10 +115,10 @@ class MySQLReservationRepository implements ReservationRepositoryInterface
         $finMois = strtotime(date('Y-m-t 23:59:59', $monthTimestamp));
 
         $stmt = $this->pdo->prepare("
-            SELECT * FROM reservations 
-            WHERE parking_id = :parking_id 
+            SELECT * FROM reservations
+            WHERE parking_id = :parking_id
             AND statut = 'terminee'
-            AND fin >= :debut_mois 
+            AND fin >= :debut_mois
             AND fin <= :fin_mois
             ORDER BY fin DESC
         ");
@@ -147,12 +146,12 @@ class MySQLReservationRepository implements ReservationRepositoryInterface
             id: $data['id'],
             userId: $data['user_id'],
             parkingId: $data['parking_id'],
-            debut: (int)$data['debut'],
-            fin: (int)$data['fin'],
-            prixEstime: (float)$data['prix_estime'],
-            statut: $data['statut']
+            startTime: (int)$data['debut'],
+            endTime: (int)$data['fin'],
+            estimatedPrice: (float)$data['prix_estime'],
+            status: $data['statut'],
+            createdAt: isset($data['created_at']) ? new \DateTimeImmutable($data['created_at']) : null,
+            updatedAt: isset($data['updated_at']) ? new \DateTimeImmutable($data['updated_at']) : null
         );
     }
 }
-
-

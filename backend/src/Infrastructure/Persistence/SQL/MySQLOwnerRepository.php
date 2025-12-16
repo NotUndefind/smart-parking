@@ -22,30 +22,39 @@ final class MySQLOwnerRepository implements OwnerRepositoryInterface
 
         if ($exists) {
             $stmt = $this->pdo->prepare("
-                UPDATE owners 
-                SET email = :email, 
-                    password = :password, 
-                    nom = :nom, 
-                    prenom = :prenom
+                UPDATE owners
+                SET email = :email,
+                    password_hash = :password_hash,
+                    company_name = :company_name,
+                    first_name = :first_name,
+                    last_name = :last_name,
+                    updated_at = :updated_at
                 WHERE id = :id
             ");
+            $stmt->execute([
+                'id' => $owner->getId(),
+                'email' => $owner->getEmail(),
+                'password_hash' => $owner->getPasswordHash(),
+                'company_name' => $owner->getCompanyName(),
+                'first_name' => $owner->getFirstName(),
+                'last_name' => $owner->getLastName(),
+                'updated_at' => $owner->getUpdatedAt()?->format('Y-m-d H:i:s'),
+            ]);
         } else {
             $stmt = $this->pdo->prepare("
-                INSERT INTO owners (id, email, password, nom, prenom, created_at)
-                VALUES (:id, :email, :password, :nom, :prenom, NOW())
+                INSERT INTO owners (id, email, password_hash, company_name, first_name, last_name, created_at)
+                VALUES (:id, :email, :password_hash, :company_name, :first_name, :last_name, :created_at)
             ");
+            $stmt->execute([
+                'id' => $owner->getId(),
+                'email' => $owner->getEmail(),
+                'password_hash' => $owner->getPasswordHash(),
+                'company_name' => $owner->getCompanyName(),
+                'first_name' => $owner->getFirstName(),
+                'last_name' => $owner->getLastName(),
+                'created_at' => $owner->getCreatedAt()->format('Y-m-d H:i:s'),
+            ]);
         }
-
-        $stmt->execute([
-            'id' => $owner->getId(),
-            'email' => $owner->getEmail(),
-            'password_hash' => $owner->getPasswordHash(),
-            'company_name' => $owner->getCompanyName(),
-            'first_name' => $owner->getFirstName(),
-            'last_name' => $owner->getLastName(),
-            'created_at' => $owner->getCreatedAt()->format('Y-m-d H:i:s'),
-            'updated_at' => $owner->getUpdatedAt()?->format('Y-m-d H:i:s'),
-        ]);
     }
 
     public function findById(string $id): ?Owner
@@ -78,10 +87,6 @@ final class MySQLOwnerRepository implements OwnerRepositoryInterface
         $data = $stmt->fetchAll();
 
         return array_map(fn($row) => $this->hydrate($row), $data);
-    }
-
-        $stmt = $this->pdo->prepare('DELETE FROM owners WHERE id = :id');
-        $stmt->execute(['id' => $id]);
     }
 
     private function hydrate(array $data): Owner

@@ -1,18 +1,17 @@
 <?php
 
-namespace Infrastructure\Persistence\SQL;
+declare(strict_types=1);
 
-use Domain\Repositories\StationnementRepositoryInterface;
-use Domain\Entities\Stationnement;
+namespace App\Infrastructure\Persistence\SQL;
+
+use App\Domain\Repositories\StationnementRepositoryInterface;
+use App\Domain\Entities\Stationnement;
 use PDO;
 
-class MySQLStationnementRepository implements StationnementRepositoryInterface
+final class MySQLStationnementRepository implements StationnementRepositoryInterface
 {
-    private PDO $pdo;
-
-    public function __construct(PDO $pdo)
+    public function __construct(private PDO $pdo)
     {
-        $this->pdo = $pdo;
     }
 
     public function save(Stationnement $stationnement): void
@@ -23,31 +22,51 @@ class MySQLStationnementRepository implements StationnementRepositoryInterface
 
         if ($exists) {
             $stmt = $this->pdo->prepare("
-                UPDATE stationnements 
+                UPDATE stationnements
                 SET user_id = :user_id,
                     parking_id = :parking_id,
-                    debut = :debut,
-                    fin = :fin,
-                    montant_facture = :montant_facture,
-                    penalite = :penalite
+                    reservation_id = :reservation_id,
+                    subscription_id = :subscription_id,
+                    entry_time = :entry_time,
+                    exit_time = :exit_time,
+                    final_price = :final_price,
+                    penalty_amount = :penalty_amount,
+                    status = :status,
+                    updated_at = :updated_at
                 WHERE id = :id
             ");
+            $stmt->execute([
+                'id' => $stationnement->getId(),
+                'user_id' => $stationnement->getUserId(),
+                'parking_id' => $stationnement->getParkingId(),
+                'reservation_id' => $stationnement->getReservationId(),
+                'subscription_id' => $stationnement->getSubscriptionId(),
+                'entry_time' => $stationnement->getEntryTime(),
+                'exit_time' => $stationnement->getExitTime(),
+                'final_price' => $stationnement->getFinalPrice(),
+                'penalty_amount' => $stationnement->getPenaltyAmount(),
+                'status' => $stationnement->getStatus(),
+                'updated_at' => $stationnement->getUpdatedAt()?->format('Y-m-d H:i:s'),
+            ]);
         } else {
             $stmt = $this->pdo->prepare("
-                INSERT INTO stationnements (id, user_id, parking_id, debut, fin, montant_facture, penalite, created_at)
-                VALUES (:id, :user_id, :parking_id, :debut, :fin, :montant_facture, :penalite, NOW())
+                INSERT INTO stationnements (id, user_id, parking_id, reservation_id, subscription_id, entry_time, exit_time, final_price, penalty_amount, status, created_at)
+                VALUES (:id, :user_id, :parking_id, :reservation_id, :subscription_id, :entry_time, :exit_time, :final_price, :penalty_amount, :status, :created_at)
             ");
+            $stmt->execute([
+                'id' => $stationnement->getId(),
+                'user_id' => $stationnement->getUserId(),
+                'parking_id' => $stationnement->getParkingId(),
+                'reservation_id' => $stationnement->getReservationId(),
+                'subscription_id' => $stationnement->getSubscriptionId(),
+                'entry_time' => $stationnement->getEntryTime(),
+                'exit_time' => $stationnement->getExitTime(),
+                'final_price' => $stationnement->getFinalPrice(),
+                'penalty_amount' => $stationnement->getPenaltyAmount(),
+                'status' => $stationnement->getStatus(),
+                'created_at' => $stationnement->getCreatedAt()->format('Y-m-d H:i:s'),
+            ]);
         }
-
-        $stmt->execute([
-            'id' => $stationnement->getId(),
-            'user_id' => $stationnement->getUserId(),
-            'parking_id' => $stationnement->getParkingId(),
-            'debut' => $stationnement->getDebut(),
-            'fin' => $stationnement->getFin(),
-            'montant_facture' => $stationnement->getMontantFacture(),
-            'penalite' => $stationnement->getPenalite()
-        ]);
     }
 
     public function findById(string $id): ?Stationnement
@@ -66,10 +85,10 @@ class MySQLStationnementRepository implements StationnementRepositoryInterface
     public function findActiveByParkingId(string $parkingId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM stationnements 
-            WHERE parking_id = :parking_id 
-            AND fin IS NULL
-            ORDER BY debut DESC
+            SELECT * FROM stationnements
+            WHERE parking_id = :parking_id
+            AND status = 'active'
+            ORDER BY entry_time DESC
         ");
         $stmt->execute(['parking_id' => $parkingId]);
         $data = $stmt->fetchAll();
@@ -80,9 +99,9 @@ class MySQLStationnementRepository implements StationnementRepositoryInterface
     public function findByUserId(string $userId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM stationnements 
-            WHERE user_id = :user_id 
-            ORDER BY debut DESC
+            SELECT * FROM stationnements
+            WHERE user_id = :user_id
+            ORDER BY entry_time DESC
         ");
         $stmt->execute(['user_id' => $userId]);
         $data = $stmt->fetchAll();
@@ -93,9 +112,9 @@ class MySQLStationnementRepository implements StationnementRepositoryInterface
     public function findByParkingId(string $parkingId): array
     {
         $stmt = $this->pdo->prepare("
-            SELECT * FROM stationnements 
-            WHERE parking_id = :parking_id 
-            ORDER BY debut DESC
+            SELECT * FROM stationnements
+            WHERE parking_id = :parking_id
+            ORDER BY entry_time DESC
         ");
         $stmt->execute(['parking_id' => $parkingId]);
         $data = $stmt->fetchAll();
@@ -103,20 +122,43 @@ class MySQLStationnementRepository implements StationnementRepositoryInterface
         return array_map(fn($row) => $this->hydrate($row), $data);
     }
 
-    public function findOutOfTimeSlotByParking(string $parkingId, int $currentTimestamp): array
-    {  
+    public function findActiveByUserAndParking(string $userId, string $parkingId): ?Stationnement
+    {
         $stmt = $this->pdo->prepare("
-            SELECT s.* 
+            SELECT * FROM stationnements
+            WHERE user_id = :user_id
+            AND parking_id = :parking_id
+            AND status = 'active'
+            ORDER BY entry_time DESC
+            LIMIT 1
+        ");
+        $stmt->execute([
+            'user_id' => $userId,
+            'parking_id' => $parkingId
+        ]);
+        $data = $stmt->fetch();
+
+        if (!$data) {
+            return null;
+        }
+
+        return $this->hydrate($data);
+    }
+
+    public function findOutOfTimeSlotByParking(string $parkingId, int $currentTimestamp): array
+    {
+        $stmt = $this->pdo->prepare("
+            SELECT s.*
             FROM stationnements s
-            LEFT JOIN reservations r ON r.user_id = s.user_id 
+            LEFT JOIN reservations r ON r.user_id = s.user_id
                 AND r.parking_id = s.parking_id
                 AND r.statut = 'active'
-                AND s.debut >= r.debut 
+                AND s.entry_time >= r.debut
                 AND :current_timestamp <= r.fin
             WHERE s.parking_id = :parking_id
-            AND s.fin IS NULL
+            AND s.status = 'active'
             AND r.id IS NULL
-            ORDER BY s.debut ASC
+            ORDER BY s.entry_time ASC
         ");
 
         $stmt->execute([
@@ -141,12 +183,15 @@ class MySQLStationnementRepository implements StationnementRepositoryInterface
             id: $data['id'],
             userId: $data['user_id'],
             parkingId: $data['parking_id'],
-            debut: (int)$data['debut'],
-            fin: $data['fin'] !== null ? (int)$data['fin'] : null,
-            montantFacture: $data['montant_facture'] !== null ? (float)$data['montant_facture'] : null,
-            penalite: (float)$data['penalite']
+            reservationId: $data['reservation_id'] ?? null,
+            subscriptionId: $data['subscription_id'] ?? null,
+            entryTime: (int)$data['entry_time'],
+            exitTime: isset($data['exit_time']) ? (int)$data['exit_time'] : null,
+            finalPrice: (float)($data['final_price'] ?? 0.0),
+            penaltyAmount: (float)($data['penalty_amount'] ?? 0.0),
+            status: $data['status'] ?? 'active',
+            createdAt: isset($data['created_at']) ? new \DateTimeImmutable($data['created_at']) : null,
+            updatedAt: isset($data['updated_at']) ? new \DateTimeImmutable($data['updated_at']) : null
         );
     }
 }
-
-
