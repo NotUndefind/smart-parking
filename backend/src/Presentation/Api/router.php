@@ -1,13 +1,14 @@
 <?php
 
-namespace Presentation\Api;
+declare(strict_types=1);
 
-use Presentation\Api\Controllers\AuthApiController;
-use Presentation\Api\Controllers\UserApiController;
-use Presentation\Api\Controllers\OwnerApiController;
+namespace App\Presentation\Api;
 
+use App\Presentation\Api\Controllers\AuthApiController;
+use App\Presentation\Api\Controllers\UserApiController;
+use App\Presentation\Api\Controllers\OwnerApiController;
 
-class Router
+final class Router
 {
     private AuthApiController $authController;
     private UserApiController $userController;
@@ -29,19 +30,25 @@ class Router
         $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
         $path = preg_replace('#^/api#', '', $path);
 
-        // Routes Auth
-        if ($method === 'POST' && $path === '/auth/register/user') {
-            $this->authController->registerUser();
-            return;
-        }
-
-        if ($method === 'POST' && $path === '/auth/register/owner') {
-            $this->authController->registerOwner();
+        // Routes Auth (User)
+        if ($method === 'POST' && $path === '/auth/register') {
+            $this->authController->register();
             return;
         }
 
         if ($method === 'POST' && $path === '/auth/login') {
             $this->authController->login();
+            return;
+        }
+
+        // Routes Auth (Owner)
+        if ($method === 'POST' && $path === '/owner/register') {
+            $this->ownerController->register();
+            return;
+        }
+
+        if ($method === 'POST' && $path === '/owner/login') {
+            $this->ownerController->login();
             return;
         }
 
@@ -106,61 +113,6 @@ class Router
             return;
         }
 
-        // Routes Owner - Parkings
-        if ($method === 'POST' && $path === '/owner/parkings') {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->createParking();
-            return;
-        }
-
-        if ($method === 'PUT' && preg_match('#^/owner/parkings/([^/]+)/tarifs$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->updateParkingTarifs($matches[1]);
-            return;
-        }
-
-        if ($method === 'PUT' && preg_match('#^/owner/parkings/([^/]+)/horaires$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->updateParkingHoraires($matches[1]);
-            return;
-        }
-
-        // Routes Owner - Gestion
-        if ($method === 'GET' && preg_match('#^/owner/parkings/([^/]+)/reservations$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->getParkingReservations($matches[1]);
-            return;
-        }
-
-        if ($method === 'GET' && preg_match('#^/owner/parkings/([^/]+)/stationnements$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->getParkingStationnements($matches[1]);
-            return;
-        }
-
-        if ($method === 'GET' && preg_match('#^/owner/parkings/([^/]+)/available-places$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->getAvailablePlaces($matches[1]);
-            return;
-        }
-
-        if ($method === 'GET' && preg_match('#^/owner/parkings/([^/]+)/revenue$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->getMonthlyRevenue($matches[1]);
-            return;
-        }
-
-        if ($method === 'POST' && preg_match('#^/owner/parkings/([^/]+)/subscription-types$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->addSubscriptionType($matches[1]);
-            return;
-        }
-
-        if ($method === 'GET' && preg_match('#^/owner/parkings/([^/]+)/out-of-timeslot-drivers$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware + role owner
-            $this->ownerController->getOutOfTimeSlotDrivers($matches[1]);
-            return;
-        }
 
         http_response_code(404);
         header('Content-Type: application/json');
