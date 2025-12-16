@@ -68,27 +68,7 @@ final class FileOwnerRepository implements OwnerRepositoryInterface
 
     private function getFilePath(string $id): string
     {
-        $json = file_get_contents($this->filePath);
-        return json_decode($json, true) ?? [];
-    }
-
-    private function saveAll(array $owners): void
-    {
-        $json = json_encode($owners, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
-        file_put_contents($this->filePath, $json, LOCK_EX);
-    }
-
-    private function ensureFileExists(): void
-    {
-        $dir = dirname($this->filePath);
-        
-        if (!is_dir($dir)) {
-            mkdir($dir, 0755, true);
-        }
-
-        if (!file_exists($this->filePath)) {
-            file_put_contents($this->filePath, json_encode([]), LOCK_EX);
-        }
+        return $this->dataDir . '/' . $id . '.json';
     }
 
     private function hydrate(array $data): Owner
