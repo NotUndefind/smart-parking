@@ -6,10 +6,13 @@ namespace App\Application\DTOs\Input;
 
 final class UpdateParkingTariffInput
 {
-    public function __construct(
+    private function __construct(
         public readonly string $parkingId,
-        public readonly array $tariffs
-    ) {
+        public readonly array $tariffs,
+    ) {}
+
+    public static function create(string $parkingId, array $tariffs): self
+    {
+        return new self(parkingId: $parkingId, tariffs: $tariffs);
     }
 }
-

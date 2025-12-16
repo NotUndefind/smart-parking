@@ -6,10 +6,13 @@ namespace App\Application\DTOs\Input;
 
 final class AuthenticateOwnerInput
 {
-    public function __construct(
+    private function __construct(
         public readonly string $email,
-        public readonly string $password
-    ) {
+        public readonly string $passwordhash,
+    ) {}
+
+    public static function create(string $email, string $passwordhash): self
+    {
+        return new self(email: $email, passwordhash: $passwordhash);
     }
 }
-

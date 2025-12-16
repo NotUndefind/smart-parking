@@ -6,10 +6,13 @@ namespace App\Application\DTOs\Input;
 
 final class UpdateParkingScheduleInput
 {
-    public function __construct(
+    private function __construct(
         public readonly string $parkingId,
-        public readonly array $schedule
-    ) {
+        public readonly array $schedule,
+    ) {}
+
+    public static function create(string $parkingId, array $schedule): self
+    {
+        return new self(parkingId: $parkingId, schedule: $schedule);
     }
 }
-
