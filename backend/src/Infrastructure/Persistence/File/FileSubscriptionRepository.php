@@ -54,14 +54,12 @@ class FileSubscriptionRepository implements SubscriptionRepositoryInterface
                 continue;
             }
 
-            // Vérifier si l'abonnement est actif
             if ($subscriptionData['date_debut'] <= $currentTimestamp && 
                 $subscriptionData['date_fin'] >= $currentTimestamp) {
                 $result[] = $this->hydrate($subscriptionData);
             }
         }
 
-        // Trier par date de début décroissante
         usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
 
         return $result;
@@ -78,7 +76,6 @@ class FileSubscriptionRepository implements SubscriptionRepositoryInterface
             }
         }
 
-        // Trier par date de début décroissante
         usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
 
         return $result;
@@ -95,7 +92,6 @@ class FileSubscriptionRepository implements SubscriptionRepositoryInterface
             }
         }
 
-        // Trier par date de début décroissante
         usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
 
         return $result;
@@ -106,7 +102,6 @@ class FileSubscriptionRepository implements SubscriptionRepositoryInterface
         $subscriptions = $this->loadAll();
         $result = [];
 
-        // Calculer le début et la fin du mois
         $debutMois = strtotime(date('Y-m-01', $monthTimestamp));
         $finMois = strtotime(date('Y-m-t 23:59:59', $monthTimestamp));
 
@@ -118,13 +113,11 @@ class FileSubscriptionRepository implements SubscriptionRepositoryInterface
             $dateDebut = $subscriptionData['date_debut'];
             $dateFin = $subscriptionData['date_fin'];
 
-            // Vérifier si l'abonnement chevauche le mois
             if ($dateDebut <= $finMois && $dateFin >= $debutMois) {
                 $result[] = $this->hydrate($subscriptionData);
             }
         }
 
-        // Trier par date de début décroissante
         usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
 
         return $result;

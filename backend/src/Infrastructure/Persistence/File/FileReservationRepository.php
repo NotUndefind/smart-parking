@@ -57,11 +57,8 @@ class FileReservationRepository implements ReservationRepositoryInterface
                 continue;
             }
 
-            // Vérifier le chevauchement
             $resDebut = $reservationData['debut'];
             $resFin = $reservationData['fin'];
-
-            // Pas de chevauchement si : fin <= debut OU debut >= fin
             $overlap = !($fin <= $resDebut || $debut >= $resFin);
 
             if ($overlap) {
@@ -83,7 +80,6 @@ class FileReservationRepository implements ReservationRepositoryInterface
             }
         }
 
-        // Trier par date de début décroissante
         usort($result, fn($a, $b) => $b->getDebut() <=> $a->getDebut());
 
         return $result;
@@ -100,7 +96,6 @@ class FileReservationRepository implements ReservationRepositoryInterface
             }
         }
 
-        // Trier par date de début décroissante
         usort($result, fn($a, $b) => $b->getDebut() <=> $a->getDebut());
 
         return $result;
@@ -111,7 +106,6 @@ class FileReservationRepository implements ReservationRepositoryInterface
         $reservations = $this->loadAll();
         $result = [];
 
-        // Calculer le début et la fin du mois
         $debutMois = strtotime(date('Y-m-01', $monthTimestamp));
         $finMois = strtotime(date('Y-m-t 23:59:59', $monthTimestamp));
 
@@ -131,7 +125,6 @@ class FileReservationRepository implements ReservationRepositoryInterface
             }
         }
 
-        // Trier par date de fin décroissante
         usort($result, fn($a, $b) => $b->getFin() <=> $a->getFin());
 
         return $result;
