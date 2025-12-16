@@ -6,6 +6,7 @@ namespace App\Application\UseCases\User;
 
 use App\Application\DTOs\Input\CreateReservationInput;
 use App\Application\DTOs\Output\ReservationOutput;
+use App\Application\Validators\TimeSlotValidator;
 use App\Domain\Entities\Reservation;
 use App\Domain\Exceptions\UserNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
@@ -17,12 +18,16 @@ final class CreateReservationUseCase
     public function __construct(
         private UserRepositoryInterface $userRepository,
         private ParkingRepositoryInterface $parkingRepository,
-        private ReservationRepositoryInterface $reservationRepository
+        private ReservationRepositoryInterface $reservationRepository,
+        private TimeSlotValidator $timeSlotValidator
     ) {
     }
 
     public function execute(CreateReservationInput $input): ReservationOutput
     {
+        // 0. Validation du créneau horaire
+        $this->timeSlotValidator->validate($input->startTime, $input->endTime);
+
         // 1. Vérifier que l'utilisateur existe
         $user = $this->userRepository->findById($input->userId);
         if ($user === null) {
