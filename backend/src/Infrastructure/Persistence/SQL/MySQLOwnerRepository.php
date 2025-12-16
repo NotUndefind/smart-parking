@@ -1,18 +1,17 @@
 <?php
 
-namespace Infrastructure\Persistence\SQL;
+declare(strict_types=1);
 
-use Domain\Repositories\OwnerRepositoryInterface;
-use Domain\Entities\Owner;
+namespace App\Infrastructure\Persistence\SQL;
+
+use App\Domain\Entities\Owner;
+use App\Domain\Repositories\OwnerRepositoryInterface;
 use PDO;
 
-class MySQLOwnerRepository implements OwnerRepositoryInterface
+final class MySQLOwnerRepository implements OwnerRepositoryInterface
 {
-    private PDO $pdo;
-
-    public function __construct(PDO $pdo)
+    public function __construct(private PDO $pdo)
     {
-        $this->pdo = $pdo;
     }
 
     public function save(Owner $owner): void
@@ -40,40 +39,31 @@ class MySQLOwnerRepository implements OwnerRepositoryInterface
         $stmt->execute([
             'id' => $owner->getId(),
             'email' => $owner->getEmail(),
-            'password' => $owner->getPassword(),
-            'nom' => $owner->getNom(),
-            'prenom' => $owner->getPrenom()
+            'password_hash' => $owner->getPasswordHash(),
+            'company_name' => $owner->getCompanyName(),
+            'first_name' => $owner->getFirstName(),
+            'last_name' => $owner->getLastName(),
+            'created_at' => $owner->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at' => $owner->getUpdatedAt()?->format('Y-m-d H:i:s'),
         ]);
     }
 
     public function findById(string $id): ?Owner
     {
-        $stmt = $this->pdo->prepare("
-            SELECT * FROM owners WHERE id = :id
-        ");
+        $stmt = $this->pdo->prepare('SELECT * FROM owners WHERE id = :id');
         $stmt->execute(['id' => $id]);
         $data = $stmt->fetch();
 
-        if (!$data) {
-            return null;
-        }
-
-        return $this->hydrate($data);
+        return $data ? $this->hydrate($data) : null;
     }
 
     public function findByEmail(string $email): ?Owner
     {
-        $stmt = $this->pdo->prepare("
-            SELECT * FROM owners WHERE email = :email
-        ");
+        $stmt = $this->pdo->prepare('SELECT * FROM owners WHERE email = :email');
         $stmt->execute(['email' => $email]);
         $data = $stmt->fetch();
 
-        if (!$data) {
-            return null;
-        }
-
-        return $this->hydrate($data);
+        return $data ? $this->hydrate($data) : null;
     }
 
     public function delete(string $id): void
@@ -90,14 +80,22 @@ class MySQLOwnerRepository implements OwnerRepositoryInterface
         return array_map(fn($row) => $this->hydrate($row), $data);
     }
 
+        $stmt = $this->pdo->prepare('DELETE FROM owners WHERE id = :id');
+        $stmt->execute(['id' => $id]);
+    }
+
     private function hydrate(array $data): Owner
     {
         return new Owner(
             id: $data['id'],
             email: $data['email'],
-            password: $data['password'],
-            nom: $data['nom'],
-            prenom: $data['prenom']
+            passwordHash: $data['password_hash'],
+            companyName: $data['company_name'],
+            firstName: $data['first_name'],
+            lastName: $data['last_name'],
+            createdAt: new \DateTimeImmutable($data['created_at']),
+            updatedAt: $data['updated_at'] ? new \DateTimeImmutable($data['updated_at']) : null
         );
     }
 }
+

@@ -1,5 +1,14 @@
 {
     "name": "smart-parking/backend",
+    "description": "Smart Parking - Backend (module authentification & utilisateur)",
+    "type": "project",
+    "require": {
+        "php": "^8.2",
+        "firebase/php-jwt": "^6.10"
+    },
+    "require-dev": {
+        "phpunit/phpunit": "^12.4"
+    },
     "autoload": {
         "psr-4": {
             "Domain\\": "src/Domain/",
@@ -10,14 +19,8 @@
     },
     "authors": [
         {
-            "name": "NotUndefind",
-            "email": "julesbourin@icloud.com"
+            "name": "Smart Parking Team",
+            "email": "dev@smart-parking.local"
         }
-    ],
-    "require": {
-        "php": "^8.2"
-    },
-    "require-dev": {
-        "phpunit/phpunit": "^11.0"
-    }
+    ]
 }

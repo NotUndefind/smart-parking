@@ -1,76 +1,72 @@
 <?php
 
-namespace Infrastructure\Persistence\File;
+declare(strict_types=1);
 
-use Domain\Repositories\OwnerRepositoryInterface;
-use Domain\Entities\Owner;
+namespace App\Infrastructure\Persistence\File;
 
-class FileOwnerRepository implements OwnerRepositoryInterface
+use App\Domain\Entities\Owner;
+use App\Domain\Repositories\OwnerRepositoryInterface;
+
+final class FileOwnerRepository implements OwnerRepositoryInterface
 {
-    private string $filePath;
+    private string $dataDir;
 
-    public function __construct(string $dataDirectory)
+    public function __construct(string $dataDir = __DIR__ . '/../../../data/owners')
     {
-        $this->filePath = rtrim($dataDirectory, '/') . '/owners.json';
-        $this->ensureFileExists();
+        $this->dataDir = $dataDir;
+        if (!is_dir($this->dataDir)) {
+            mkdir($this->dataDir, 0755, true);
+        }
     }
 
     public function save(Owner $owner): void
     {
-        $owners = $this->loadAll();
-        $owners[$owner->getId()] = [
+        $filePath = $this->getFilePath($owner->getId());
+        $data = [
             'id' => $owner->getId(),
             'email' => $owner->getEmail(),
-            'password' => $owner->getPassword(),
-            'nom' => $owner->getNom(),
-            'prenom' => $owner->getPrenom(),
-            'created_at' => $owners[$owner->getId()]['created_at'] ?? date('Y-m-d H:i:s')
+            'password_hash' => $owner->getPasswordHash(),
+            'company_name' => $owner->getCompanyName(),
+            'first_name' => $owner->getFirstName(),
+            'last_name' => $owner->getLastName(),
+            'created_at' => $owner->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at' => $owner->getUpdatedAt()?->format('Y-m-d H:i:s'),
         ];
-
-        $this->saveAll($owners);
+        file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT));
     }
 
     public function findById(string $id): ?Owner
     {
-        $owners = $this->loadAll();
-
-        if (!isset($owners[$id])) {
+        $filePath = $this->getFilePath($id);
+        if (!file_exists($filePath)) {
             return null;
         }
 
-        return $this->hydrate($owners[$id]);
+        $data = json_decode(file_get_contents($filePath), true);
+        return $data ? $this->hydrate($data) : null;
     }
 
     public function findByEmail(string $email): ?Owner
     {
-        $owners = $this->loadAll();
-
-        foreach ($owners as $ownerData) {
-            if ($ownerData['email'] === $email) {
-                return $this->hydrate($ownerData);
+        $files = glob($this->dataDir . '/*.json');
+        foreach ($files as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if ($data && $data['email'] === $email) {
+                return $this->hydrate($data);
             }
         }
-
         return null;
     }
 
     public function delete(string $id): void
     {
-        $owners = $this->loadAll();
-
-        if (isset($owners[$id])) {
-            unset($owners[$id]);
-            $this->saveAll($owners);
+        $filePath = $this->getFilePath($id);
+        if (file_exists($filePath)) {
+            unlink($filePath);
         }
     }
 
-    public function findAll(): array
-    {
-        $owners = $this->loadAll();
-        return array_map(fn($data) => $this->hydrate($data), array_values($owners));
-    }
-
-    private function loadAll(): array
+    private function getFilePath(string $id): string
     {
         $json = file_get_contents($this->filePath);
         return json_decode($json, true) ?? [];
@@ -100,11 +96,13 @@ class FileOwnerRepository implements OwnerRepositoryInterface
         return new Owner(
             id: $data['id'],
             email: $data['email'],
-            password: $data['password'],
-            nom: $data['nom'],
-            prenom: $data['prenom']
+            passwordHash: $data['password_hash'],
+            companyName: $data['company_name'],
+            firstName: $data['first_name'],
+            lastName: $data['last_name'],
+            createdAt: new \DateTimeImmutable($data['created_at']),
+            updatedAt: $data['updated_at'] ? new \DateTimeImmutable($data['updated_at']) : null
         );
     }
 }
-
 

@@ -1,93 +1,65 @@
 <?php
 
-namespace Infrastructure\Persistence\SQL;
+declare(strict_types=1);
 
-use Domain\Repositories\UserRepositoryInterface;
-use Domain\Entities\User;
+namespace App\Infrastructure\Persistence\SQL;
+
+use App\Domain\Entities\User;
+use App\Domain\Repositories\UserRepositoryInterface;
 use PDO;
 
-class MySQLUserRepository implements UserRepositoryInterface
+final class MySQLUserRepository implements UserRepositoryInterface
 {
-    private PDO $pdo;
-
-    public function __construct(PDO $pdo)
+    public function __construct(private PDO $pdo)
     {
-        $this->pdo = $pdo;
     }
 
     public function save(User $user): void
     {
-        $stmt = $this->pdo->prepare("SELECT id FROM users WHERE id = :id");
-        $stmt->execute(['id' => $user->getId()]);
-        $exists = $stmt->fetch();
-
-        if ($exists) {
-            $stmt = $this->pdo->prepare("
-                UPDATE users 
-                SET email = :email, 
-                    password = :password, 
-                    nom = :nom, 
-                    prenom = :prenom
-                WHERE id = :id
-            ");
-        } else {
-            $stmt = $this->pdo->prepare("
-                INSERT INTO users (id, email, password, nom, prenom, created_at)
-                VALUES (:id, :email, :password, :nom, :prenom, NOW())
-            ");
-        }
+        $stmt = $this->pdo->prepare('
+            INSERT INTO users (id, email, password_hash, first_name, last_name, created_at, updated_at)
+            VALUES (:id, :email, :password_hash, :first_name, :last_name, :created_at, :updated_at)
+            ON DUPLICATE KEY UPDATE
+                email = :email,
+                password_hash = :password_hash,
+                first_name = :first_name,
+                last_name = :last_name,
+                updated_at = :updated_at
+        ');
 
         $stmt->execute([
             'id' => $user->getId(),
             'email' => $user->getEmail(),
-            'password' => $user->getPassword(),
-            'nom' => $user->getNom(),
-            'prenom' => $user->getPrenom()
+            'password_hash' => $user->getPasswordHash(),
+            'first_name' => $user->getFirstName(),
+            'last_name' => $user->getLastName(),
+            'created_at' => $user->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at' => $user->getUpdatedAt()?->format('Y-m-d H:i:s'),
         ]);
     }
 
     public function findById(string $id): ?User
     {
-        $stmt = $this->pdo->prepare("
-            SELECT * FROM users WHERE id = :id
-        ");
+        $stmt = $this->pdo->prepare('SELECT * FROM users WHERE id = :id');
         $stmt->execute(['id' => $id]);
         $data = $stmt->fetch();
 
-        if (!$data) {
-            return null;
-        }
-
-        return $this->hydrate($data);
+        return $data ? $this->hydrate($data) : null;
     }
 
     public function findByEmail(string $email): ?User
     {
-        $stmt = $this->pdo->prepare("
-            SELECT * FROM users WHERE email = :email
-        ");
+        $stmt = $this->pdo->prepare('SELECT * FROM users WHERE email = :email');
         $stmt->execute(['email' => $email]);
         $data = $stmt->fetch();
 
-        if (!$data) {
-            return null;
-        }
-
-        return $this->hydrate($data);
+        return $data ? $this->hydrate($data) : null;
     }
 
     public function delete(string $id): void
     {
-        $stmt = $this->pdo->prepare("DELETE FROM users WHERE id = :id");
+        $stmt = $this->pdo->prepare('DELETE FROM users WHERE id = :id');
         $stmt->execute(['id' => $id]);
-    }
-
-    public function findAll(): array
-    {
-        $stmt = $this->pdo->query("SELECT * FROM users ORDER BY created_at DESC");
-        $data = $stmt->fetchAll();
-
-        return array_map(fn($row) => $this->hydrate($row), $data);
     }
 
     private function hydrate(array $data): User
@@ -95,11 +67,12 @@ class MySQLUserRepository implements UserRepositoryInterface
         return new User(
             id: $data['id'],
             email: $data['email'],
-            password: $data['password'],
-            nom: $data['nom'],
-            prenom: $data['prenom']
+            passwordHash: $data['password_hash'],
+            firstName: $data['first_name'],
+            lastName: $data['last_name'],
+            createdAt: new \DateTimeImmutable($data['created_at']),
+            updatedAt: $data['updated_at'] ? new \DateTimeImmutable($data['updated_at']) : null
         );
     }
 }
-
 

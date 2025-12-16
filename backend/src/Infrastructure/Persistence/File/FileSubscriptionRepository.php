@@ -1,36 +1,40 @@
 <?php
 
-namespace Infrastructure\Persistence\File;
+declare(strict_types=1);
 
-use Domain\Repositories\SubscriptionRepositoryInterface;
-use Domain\Entities\Subscription;
+namespace App\Infrastructure\Persistence\File;
 
-class FileSubscriptionRepository implements SubscriptionRepositoryInterface
+use App\Domain\Entities\Subscription;
+use App\Domain\Repositories\SubscriptionRepositoryInterface;
+
+final class FileSubscriptionRepository implements SubscriptionRepositoryInterface
 {
-    private string $filePath;
+    private string $dataDir;
 
-    public function __construct(string $dataDirectory)
+    public function __construct(string $dataDir = __DIR__ . '/../../../data/subscriptions')
     {
-        $this->filePath = rtrim($dataDirectory, '/') . '/subscriptions.json';
-        $this->ensureFileExists();
+        $this->dataDir = $dataDir;
+        if (!is_dir($this->dataDir)) {
+            mkdir($this->dataDir, 0755, true);
+        }
     }
 
     public function save(Subscription $subscription): void
     {
-        $subscriptions = $this->loadAll();
-        $subscriptions[$subscription->getId()] = [
+        $filePath = $this->getFilePath($subscription->getId());
+        $data = [
             'id' => $subscription->getId(),
-            'user_id' => $subscription->getUserId(),
             'parking_id' => $subscription->getParkingId(),
-            'creneaux_reserves' => $subscription->getCreneauxReserves(),
-            'date_debut' => $subscription->getDateDebut(),
-            'date_fin' => $subscription->getDateFin(),
-            'prix_mensuel' => $subscription->getPrixMensuel(),
+            'user_id' => $subscription->getUserId(),
             'type' => $subscription->getType(),
-            'created_at' => $subscriptions[$subscription->getId()]['created_at'] ?? date('Y-m-d H:i:s')
+            'price' => $subscription->getPrice(),
+            'start_date' => $subscription->getStartDate(),
+            'end_date' => $subscription->getEndDate(),
+            'is_active' => $subscription->isActive(),
+            'created_at' => $subscription->getCreatedAt()->format('Y-m-d H:i:s'),
+            'updated_at' => $subscription->getUpdatedAt()?->format('Y-m-d H:i:s'),
         ];
-
-        $this->saveAll($subscriptions);
+        file_put_contents($filePath, json_encode($data, JSON_PRETTY_PRINT));
     }
 
     public function findById(string $id): ?Subscription
@@ -54,73 +58,65 @@ class FileSubscriptionRepository implements SubscriptionRepositoryInterface
                 continue;
             }
 
+            // Vérifier si l'abonnement est actif
             if ($subscriptionData['date_debut'] <= $currentTimestamp && 
                 $subscriptionData['date_fin'] >= $currentTimestamp) {
                 $result[] = $this->hydrate($subscriptionData);
             }
         }
 
+        // Trier par date de début décroissante
         usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
 
         return $result;
+        $filePath = $this->getFilePath($id);
+        if (!file_exists($filePath)) {
+            return null;
+        }
+
+        $data = json_decode(file_get_contents($filePath), true);
+        return $data ? $this->hydrate($data) : null;
     }
 
     public function findByUserId(string $userId): array
     {
-        $subscriptions = $this->loadAll();
-        $result = [];
-
-        foreach ($subscriptions as $subscriptionData) {
-            if ($subscriptionData['user_id'] === $userId) {
-                $result[] = $this->hydrate($subscriptionData);
+        $subscriptions = [];
+        $files = glob($this->dataDir . '/*.json');
+        foreach ($files as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if ($data && $data['user_id'] === $userId) {
+                $subscriptions[] = $this->hydrate($data);
             }
         }
-
-        usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
-
-        return $result;
+        return $subscriptions;
     }
 
     public function findByParkingId(string $parkingId): array
     {
-        $subscriptions = $this->loadAll();
-        $result = [];
-
-        foreach ($subscriptions as $subscriptionData) {
-            if ($subscriptionData['parking_id'] === $parkingId) {
-                $result[] = $this->hydrate($subscriptionData);
+        $subscriptions = [];
+        $files = glob($this->dataDir . '/*.json');
+        foreach ($files as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if ($data && $data['parking_id'] === $parkingId) {
+                $subscriptions[] = $this->hydrate($data);
             }
         }
-
-        usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
-
-        return $result;
+        return $subscriptions;
     }
 
-    public function findActiveByParkingAndMonth(string $parkingId, int $monthTimestamp): array
+    public function findActiveByUserAndParking(string $userId, string $parkingId, int $timestamp): ?Subscription
     {
-        $subscriptions = $this->loadAll();
-        $result = [];
-
-        $debutMois = strtotime(date('Y-m-01', $monthTimestamp));
-        $finMois = strtotime(date('Y-m-t 23:59:59', $monthTimestamp));
-
-        foreach ($subscriptions as $subscriptionData) {
-            if ($subscriptionData['parking_id'] !== $parkingId) {
-                continue;
-            }
-
-            $dateDebut = $subscriptionData['date_debut'];
-            $dateFin = $subscriptionData['date_fin'];
-
-            if ($dateDebut <= $finMois && $dateFin >= $debutMois) {
-                $result[] = $this->hydrate($subscriptionData);
+        $files = glob($this->dataDir . '/*.json');
+        foreach ($files as $file) {
+            $data = json_decode(file_get_contents($file), true);
+            if ($data && $data['user_id'] === $userId && $data['parking_id'] === $parkingId) {
+                $subscription = $this->hydrate($data);
+                if ($subscription->isValidAt($timestamp)) {
+                    return $subscription;
+                }
             }
         }
-
-        usort($result, fn($a, $b) => $b->getDateDebut() <=> $a->getDateDebut());
-
-        return $result;
+        return null;
     }
 
     public function delete(string $id): void
@@ -156,19 +152,31 @@ class FileSubscriptionRepository implements SubscriptionRepositoryInterface
         if (!file_exists($this->filePath)) {
             file_put_contents($this->filePath, json_encode([]), LOCK_EX);
         }
+        $filePath = $this->getFilePath($id);
+        if (file_exists($filePath)) {
+            unlink($filePath);
+        }
+    }
+
+    private function getFilePath(string $id): string
+    {
+        return $this->dataDir . '/' . $id . '.json';
     }
 
     private function hydrate(array $data): Subscription
     {
         return new Subscription(
             id: $data['id'],
-            userId: $data['user_id'],
             parkingId: $data['parking_id'],
-            creneauxReserves: $data['creneaux_reserves'],
-            dateDebut: (int)$data['date_debut'],
-            dateFin: (int)$data['date_fin'],
-            prixMensuel: (float)$data['prix_mensuel'],
-            type: $data['type']
+            userId: $data['user_id'],
+            type: $data['type'],
+            price: $data['price'],
+            startDate: $data['start_date'],
+            endDate: $data['end_date'],
+            isActive: $data['is_active'] ?? true,
+            createdAt: new \DateTimeImmutable($data['created_at']),
+            updatedAt: $data['updated_at'] ? new \DateTimeImmutable($data['updated_at']) : null
         );
     }
 }
+
