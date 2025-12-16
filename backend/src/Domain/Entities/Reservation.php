@@ -61,11 +61,7 @@ final class Reservation
         return $this->startTime;
     }
 
-<<<<<<< HEAD
-    public function getEndTime(): string
-=======
     public function getEndTime(): int
->>>>>>> origin/feature/imrane-user-auth-module
     {
         return $this->endTime;
     }
