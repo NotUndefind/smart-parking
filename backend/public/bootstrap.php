@@ -22,6 +22,7 @@ use App\Infrastructure\Security\JWTService;
 use App\Infrastructure\Security\PasswordHasher;
 use App\Presentation\Api\Controllers\AuthApiController;
 use App\Presentation\Api\Controllers\OwnerApiController;
+use App\Presentation\Api\Controllers\UserApiController;
 use App\Presentation\Api\Router\ApiRouter;
 
 // Configuration
@@ -106,7 +107,9 @@ $ownerController = new OwnerApiController(
     authenticateOwnerUseCase: $authenticateOwnerUseCase
 );
 
+$userController = new UserApiController();
+
 // Router
-$router = new ApiRouter($authController, $ownerController);
+$router = new ApiRouter($authController, $ownerController, $userController);
 
 return $router;
