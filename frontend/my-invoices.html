@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes factures - Smart Parking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Smart Parking</div>
+        <ul>
+            <li><a href="index.html">Rechercher</a></li>
+            <li><a href="my-reservations.html">Mes réservations</a></li>
+            <li><a href="my-invoices.html">Mes factures</a></li>
+            <li><a href="#" id="logout-btn">Déconnexion</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Mes factures</h2>
+
+            <div id="alert-container"></div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Chargement de vos factures...</p>
+            </div>
+
+            <div id="invoices-container"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        if (!authAPI.isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = authAPI.getUser();
+        const alertContainer = document.getElementById('alert-container');
+        const invoicesContainer = document.getElementById('invoices-container');
+        const loadingDiv = document.getElementById('loading');
+
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            authAPI.logout();
+        });
+
+        function showAlert(message, type = 'info') {
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertContainer.innerHTML = '', 5000);
+        }
+
+        async function loadInvoices() {
+            loadingDiv.style.display = 'block';
+
+            try {
+                const response = await invoiceAPI.getUserInvoices(user.id);
+                displayInvoices(response.invoices || []);
+            } catch (error) {
+                showAlert('Erreur lors du chargement des factures', 'error');
+                invoicesContainer.innerHTML = '<p>Aucune facture trouvée</p>';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function displayInvoices(invoices) {
+            if (invoices.length === 0) {
+                invoicesContainer.innerHTML = `
+                    <p style="text-align: center; color: #666;">
+                        Vous n'avez aucune facture
+                    </p>
+                    <a href="index.html" class="btn btn-primary btn-block">
+                        Rechercher un parking
+                    </a>
+                `;
+                return;
+            }
+
+            const totalAmount = invoices.reduce((sum, inv) => sum + parseFloat(inv.montant_total || 0), 0);
+
+            const html = `
+                <div style="margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+                    <p style="margin: 0;"><strong>Total des factures:</strong> ${totalAmount.toFixed(2)}€</p>
+                </div>
+
+                <table class="reservations-table">
+                    <thead>
+                        <tr>
+                            <th>Numéro</th>
+                            <th>Date</th>
+                            <th>Parking</th>
+                            <th>Type</th>
+                            <th>Montant HT</th>
+                            <th>TVA</th>
+                            <th>Montant TTC</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${invoices.map(invoice => `
+                            <tr>
+                                <td><strong>${invoice.numero || invoice.id}</strong></td>
+                                <td>${formatDate(invoice.date_emission)}</td>
+                                <td>${invoice.parking_nom || 'N/A'}</td>
+                                <td>${getTypeLabel(invoice.type)}</td>
+                                <td>${invoice.montant_ht || '0.00'}€</td>
+                                <td>${invoice.montant_tva || '0.00'}€</td>
+                                <td><strong>${invoice.montant_total || '0.00'}€</strong></td>
+                                <td>
+                                    <span class="status-badge status-${invoice.statut}">
+                                        ${getStatusLabel(invoice.statut)}
+                                    </span>
+                                </td>
+                                <td>
+                                    <button
+                                        class="btn btn-secondary"
+                                        onclick="viewInvoice('${invoice.id}')"
+                                    >
+                                        Voir
+                                    </button>
+                                    <button
+                                        class="btn btn-primary"
+                                        onclick="downloadInvoice('${invoice.id}')"
+                                    >
+                                        PDF
+                                    </button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            invoicesContainer.innerHTML = html;
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString('fr-FR');
+        }
+
+        function getTypeLabel(type) {
+            const labels = {
+                'reservation': 'Réservation',
+                'stationnement': 'Stationnement',
+                'abonnement': 'Abonnement',
+                'penalite': 'Pénalité'
+            };
+            return labels[type] || type || 'N/A';
+        }
+
+        function getStatusLabel(status) {
+            const labels = {
+                'paid': 'Payée',
+                'unpaid': 'Non payée',
+                'cancelled': 'Annulée'
+            };
+            return labels[status] || status || 'N/A';
+        }
+
+        window.viewInvoice = function(invoiceId) {
+            window.location.href = `invoice-details.html?id=${invoiceId}`;
+        };
+
+        window.downloadInvoice = async function(invoiceId) {
+            try {
+                showAlert('Génération du PDF en cours...', 'info');
+
+                const response = await fetch(`${API_BASE_URL}/invoices/${invoiceId}/pdf`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur lors du téléchargement');
+                }
+
+                const blob = await response.blob();
+                const url = window.URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `facture-${invoiceId}.pdf`;
+                document.body.appendChild(a);
+                a.click();
+                window.URL.revokeObjectURL(url);
+                document.body.removeChild(a);
+
+                showAlert('Facture téléchargée avec succès', 'success');
+            } catch (error) {
+                showAlert('Erreur lors du téléchargement de la facture', 'error');
+            }
+        };
+
+        window.addEventListener('load', () => {
+            loadInvoices();
+        });
+    </script>
+</body>
+</html>

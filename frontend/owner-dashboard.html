@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard Propriétaire - Smart Parking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Smart Parking - Propriétaire</div>
+        <ul>
+            <li><a href="owner-dashboard.html">Dashboard</a></li>
+            <li><a href="#" id="logout-btn">Déconnexion</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Bienvenue <span id="owner-name"></span></h2>
+            <div id="alert-container"></div>
+        </div>
+
+        <div class="card">
+            <h2>Mes parkings</h2>
+            <button class="btn btn-primary" onclick="showCreateParkingForm()">
+                Créer un nouveau parking
+            </button>
+            <div id="parkings-list" style="margin-top: 1rem;"></div>
+        </div>
+
+        <div class="card" id="create-parking-form" style="display: none;">
+            <h2>Créer un parking</h2>
+            <form id="parking-form">
+                <div class="form-group">
+                    <label for="nom">Nom du parking</label>
+                    <input type="text" id="nom" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="adresse">Adresse</label>
+                    <input type="text" id="adresse" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="latitude">Latitude</label>
+                    <input type="number" step="0.000001" id="latitude" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="longitude">Longitude</label>
+                    <input type="number" step="0.000001" id="longitude" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="nb_places">Nombre de places</label>
+                    <input type="number" id="nb_places" required min="1">
+                </div>
+
+                <div class="form-group">
+                    <label for="tarif_horaire">Tarif horaire (€)</label>
+                    <input type="number" step="0.01" id="tarif_horaire" required min="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="horaires">Horaires d'ouverture</label>
+                    <input type="text" id="horaires" placeholder="Ex: 24h/24 ou Lun-Ven 8h-18h" required>
+                </div>
+
+                <button type="submit" class="btn btn-primary">Créer le parking</button>
+                <button type="button" class="btn btn-secondary" onclick="hideCreateParkingForm()">Annuler</button>
+            </form>
+        </div>
+
+        <div class="card" id="parking-details" style="display: none;">
+            <h2 id="parking-title"></h2>
+            <div id="parking-info"></div>
+
+            <div style="margin-top: 2rem;">
+                <h3>Statistiques</h3>
+                <div id="parking-stats"></div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3>Réservations</h3>
+                <div id="parking-reservations"></div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3>Stationnements en cours</h3>
+                <div id="parking-stationnements"></div>
+            </div>
+
+            <div style="margin-top: 2rem;">
+                <h3>Dépassements de temps</h3>
+                <div id="parking-overstays"></div>
+            </div>
+
+            <button class="btn btn-secondary" onclick="hideParkingDetails()">Retour à la liste</button>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        if (!authAPI.isAuthenticated() || !authAPI.isOwner()) {
+            window.location.href = 'owner-login.html';
+        }
+
+        const owner = authAPI.getOwner();
+        const alertContainer = document.getElementById('alert-container');
+
+        document.getElementById('owner-name').textContent = owner?.first_name || owner?.nom || '';
+
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            authAPI.logout();
+        });
+
+        function showAlert(message, type = 'info') {
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertContainer.innerHTML = '', 5000);
+        }
+
+        function showCreateParkingForm() {
+            document.getElementById('create-parking-form').style.display = 'block';
+        }
+
+        function hideCreateParkingForm() {
+            document.getElementById('create-parking-form').style.display = 'none';
+            document.getElementById('parking-form').reset();
+        }
+
+        let currentParkingId = null;
+
+        async function loadParkings() {
+            try {
+                const response = await fetch(`${API_BASE_URL}/owners/${owner.id}/parkings`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                const data = await response.json();
+                displayParkings(data.parkings || []);
+            } catch (error) {
+                document.getElementById('parkings-list').innerHTML = '<p>Aucun parking créé pour le moment</p>';
+            }
+        }
+
+        function displayParkings(parkings) {
+            if (parkings.length === 0) {
+                document.getElementById('parkings-list').innerHTML = '<p>Aucun parking créé pour le moment</p>';
+                return;
+            }
+
+            const html = parkings.map(parking => `
+                <div class="parking-card" style="margin-top: 1rem;">
+                    <h3>${parking.nom || 'Parking'}</h3>
+                    <p>${parking.adresse || ''}</p>
+                    <p><strong>Places:</strong> ${parking.nb_places}</p>
+                    <p><strong>Tarif:</strong> ${parking.tarif_horaire}€/h</p>
+                    <button class="btn btn-primary" onclick="viewParkingDetails('${parking.id}')">
+                        Voir les détails
+                    </button>
+                </div>
+            `).join('');
+
+            document.getElementById('parkings-list').innerHTML = html;
+        }
+
+        window.viewParkingDetails = async function(parkingId) {
+            currentParkingId = parkingId;
+            document.querySelector('.card:nth-child(2)').style.display = 'none';
+            document.getElementById('parking-details').style.display = 'block';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/parkings/${parkingId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                const data = await response.json();
+                const parking = data.parking;
+
+                document.getElementById('parking-title').textContent = parking.nom || 'Parking';
+                document.getElementById('parking-info').innerHTML = `
+                    <p><strong>Adresse:</strong> ${parking.adresse}</p>
+                    <p><strong>Places totales:</strong> ${parking.nb_places}</p>
+                    <p><strong>Tarif horaire:</strong> ${parking.tarif_horaire}€</p>
+                    <p><strong>Horaires:</strong> ${parking.horaires}</p>
+                `;
+
+                await loadParkingStats(parkingId);
+                await loadParkingReservations(parkingId);
+                await loadParkingStationnements(parkingId);
+                await loadParkingOverstays(parkingId);
+            } catch (error) {
+                showAlert('Erreur lors du chargement des détails', 'error');
+            }
+        };
+
+        async function loadParkingStats(parkingId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/parkings/${parkingId}/revenue?month=${new Date().getMonth() + 1}&year=${new Date().getFullYear()}`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                const data = await response.json();
+
+                document.getElementById('parking-stats').innerHTML = `
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+                        <div class="stat-card">
+                            <h4>Chiffre d'affaires mensuel</h4>
+                            <p style="font-size: 1.5rem; font-weight: bold; color: #27ae60;">
+                                ${data.revenue || '0.00'}€
+                            </p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Réservations du mois</h4>
+                            <p style="font-size: 1.5rem; font-weight: bold;">
+                                ${data.reservations_count || 0}
+                            </p>
+                        </div>
+                        <div class="stat-card">
+                            <h4>Taux d'occupation</h4>
+                            <p style="font-size: 1.5rem; font-weight: bold;">
+                                ${data.occupation_rate || 0}%
+                            </p>
+                        </div>
+                    </div>
+                `;
+            } catch (error) {
+                document.getElementById('parking-stats').innerHTML = '<p>Statistiques non disponibles</p>';
+            }
+        }
+
+        async function loadParkingReservations(parkingId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/parkings/${parkingId}/reservations`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                const data = await response.json();
+                const reservations = data.reservations || [];
+
+                if (reservations.length === 0) {
+                    document.getElementById('parking-reservations').innerHTML = '<p>Aucune réservation</p>';
+                    return;
+                }
+
+                const html = `
+                    <table class="reservations-table">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Début</th>
+                                <th>Fin</th>
+                                <th>Statut</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${reservations.map(res => `
+                                <tr>
+                                    <td>${res.user_email || res.user_id}</td>
+                                    <td>${formatDateTime(res.debut)}</td>
+                                    <td>${formatDateTime(res.fin)}</td>
+                                    <td>${res.statut}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('parking-reservations').innerHTML = html;
+            } catch (error) {
+                document.getElementById('parking-reservations').innerHTML = '<p>Aucune réservation</p>';
+            }
+        }
+
+        async function loadParkingStationnements(parkingId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/parkings/${parkingId}/stationnements`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                const data = await response.json();
+                const stationnements = data.stationnements || [];
+
+                if (stationnements.length === 0) {
+                    document.getElementById('parking-stationnements').innerHTML = '<p>Aucun stationnement en cours</p>';
+                    return;
+                }
+
+                const html = `
+                    <table class="reservations-table">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Heure d'entrée</th>
+                                <th>Durée</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${stationnements.map(stat => `
+                                <tr>
+                                    <td>${stat.user_email || stat.user_id}</td>
+                                    <td>${formatDateTime(stat.heure_entree)}</td>
+                                    <td>${calculateDuration(stat.heure_entree)}</td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('parking-stationnements').innerHTML = html;
+            } catch (error) {
+                document.getElementById('parking-stationnements').innerHTML = '<p>Aucun stationnement en cours</p>';
+            }
+        }
+
+        async function loadParkingOverstays(parkingId) {
+            try {
+                const response = await fetch(`${API_BASE_URL}/parkings/${parkingId}/overstays`, {
+                    headers: {
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    }
+                });
+
+                const data = await response.json();
+                const overstays = data.overstays || [];
+
+                if (overstays.length === 0) {
+                    document.getElementById('parking-overstays').innerHTML = `
+                        <p style="color: #27ae60;">Aucun dépassement de temps</p>
+                    `;
+                    return;
+                }
+
+                const html = `
+                    <table class="reservations-table">
+                        <thead>
+                            <tr>
+                                <th>Utilisateur</th>
+                                <th>Entrée</th>
+                                <th>Dépassement</th>
+                                <th>Pénalité</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${overstays.map(overstay => `
+                                <tr style="background-color: #fff3cd;">
+                                    <td>${overstay.user_email || overstay.user_id}</td>
+                                    <td>${formatDateTime(overstay.heure_entree)}</td>
+                                    <td style="color: #e74c3c; font-weight: bold;">
+                                        ${calculateDuration(overstay.heure_entree)}
+                                    </td>
+                                    <td style="color: #e74c3c; font-weight: bold;">
+                                        20.00€
+                                    </td>
+                                </tr>
+                            `).join('')}
+                        </tbody>
+                    </table>
+                `;
+
+                document.getElementById('parking-overstays').innerHTML = html;
+            } catch (error) {
+                document.getElementById('parking-overstays').innerHTML = '<p>Aucun dépassement</p>';
+            }
+        }
+
+        function hideParkingDetails() {
+            document.getElementById('parking-details').style.display = 'none';
+            document.querySelector('.card:nth-child(2)').style.display = 'block';
+            currentParkingId = null;
+        }
+
+        function formatDateTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString('fr-FR');
+        }
+
+        function calculateDuration(startTimestamp) {
+            const now = Date.now();
+            const start = startTimestamp * 1000;
+            const diff = now - start;
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            return `${hours}h ${minutes}min`;
+        }
+
+        const parkingForm = document.getElementById('parking-form');
+        parkingForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const parkingData = {
+                owner_id: owner.id,
+                nom: document.getElementById('nom').value,
+                adresse: document.getElementById('adresse').value,
+                latitude: parseFloat(document.getElementById('latitude').value),
+                longitude: parseFloat(document.getElementById('longitude').value),
+                nb_places: parseInt(document.getElementById('nb_places').value),
+                tarif_horaire: parseFloat(document.getElementById('tarif_horaire').value),
+                horaires: document.getElementById('horaires').value
+            };
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/parkings`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${localStorage.getItem('token')}`
+                    },
+                    body: JSON.stringify(parkingData)
+                });
+
+                if (!response.ok) {
+                    throw new Error('Erreur lors de la création');
+                }
+
+                showAlert('Parking créé avec succès', 'success');
+                hideCreateParkingForm();
+                loadParkings();
+            } catch (error) {
+                showAlert(error.message || 'Erreur lors de la création du parking', 'error');
+            }
+        });
+
+        window.addEventListener('load', () => {
+            loadParkings();
+        });
+    </script>
+
+    <style>
+        .stat-card {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .stat-card h4 {
+            margin: 0 0 0.5rem 0;
+            font-size: 0.9rem;
+            color: #666;
+        }
+    </style>
+</body>
+</html>

@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes réservations - Smart Parking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Smart Parking</div>
+        <ul>
+            <li><a href="index.html">Rechercher</a></li>
+            <li><a href="my-reservations.html">Mes réservations</a></li>
+            <li><a href="my-subscriptions.html">Mes abonnements</a></li>
+            <li><a href="my-stationnements.html">Mes stationnements</a></li>
+            <li><a href="my-invoices.html">Mes factures</a></li>
+            <li><a href="#" id="logout-btn">Déconnexion</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Mes réservations</h2>
+
+            <div id="alert-container"></div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Chargement de vos réservations...</p>
+            </div>
+
+            <div id="reservations-container"></div>
+        </div>
+
+        <div class="card">
+            <h2>Mes stationnements en cours</h2>
+
+            <div id="stationnements-container"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        // Vérifier l'authentification
+        if (!authAPI.isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const alertContainer = document.getElementById('alert-container');
+        const reservationsContainer = document.getElementById('reservations-container');
+        const stationnementsContainer = document.getElementById('stationnements-container');
+        const loadingDiv = document.getElementById('loading');
+
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            authAPI.logout();
+        });
+
+        function showAlert(message, type = 'info') {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+        }
+
+        const user = authAPI.getUser();
+
+        async function loadReservations() {
+            loadingDiv.style.display = 'block';
+
+            try {
+                const response = await reservationAPI.getUserReservations(user.id);
+                displayReservations(response.reservations || []);
+            } catch (error) {
+                showAlert('Erreur lors du chargement des réservations', 'error');
+                reservationsContainer.innerHTML = '<p>Aucune réservation trouvée</p>';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        async function loadStationnements() {
+            try {
+                const response = await stationnementAPI.getUserStationnements(user.id);
+                displayStationnements(response.stationnements || []);
+            } catch (error) {
+                stationnementsContainer.innerHTML = '<p>Aucun stationnement en cours</p>';
+            }
+        }
+
+        function displayReservations(reservations) {
+            if (reservations.length === 0) {
+                reservationsContainer.innerHTML = '<p>Vous n\'avez aucune réservation</p>';
+                return;
+            }
+
+            const html = `
+                <table class="reservations-table">
+                    <thead>
+                        <tr>
+                            <th>Parking</th>
+                            <th>Date début</th>
+                            <th>Date fin</th>
+                            <th>Prix estimé</th>
+                            <th>Statut</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${reservations.map(res => `
+                            <tr>
+                                <td>${res.parking_nom || 'Parking'}</td>
+                                <td>${formatDate(res.debut)}</td>
+                                <td>${formatDate(res.fin)}</td>
+                                <td>${res.prix_estime || '0'}€</td>
+                                <td>
+                                    <span class="status-badge status-${res.statut}">
+                                        ${getStatusLabel(res.statut)}
+                                    </span>
+                                </td>
+                                <td>
+                                    ${res.statut === 'active' ? `
+                                        <button
+                                            class="btn btn-primary"
+                                            onclick="downloadInvoice('${res.id}')"
+                                        >
+                                            Facture
+                                        </button>
+                                    ` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            reservationsContainer.innerHTML = html;
+        }
+
+        function displayStationnements(stationnements) {
+            if (stationnements.length === 0) {
+                stationnementsContainer.innerHTML = '<p>Aucun stationnement en cours</p>';
+                return;
+            }
+
+            const html = `
+                <table class="reservations-table">
+                    <thead>
+                        <tr>
+                            <th>Parking</th>
+                            <th>Heure d'entrée</th>
+                            <th>Durée</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${stationnements.map(stat => `
+                            <tr>
+                                <td>${stat.parking_nom || 'Parking'}</td>
+                                <td>${formatDate(stat.heure_entree)}</td>
+                                <td>${calculateDuration(stat.heure_entree)}</td>
+                                <td>
+                                    ${!stat.heure_sortie ? `
+                                        <button
+                                            class="btn btn-danger"
+                                            onclick="exitParking('${stat.id}')"
+                                        >
+                                            Sortir
+                                        </button>
+                                    ` : ''}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            stationnementsContainer.innerHTML = html;
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString('fr-FR');
+        }
+
+        function getStatusLabel(status) {
+            const labels = {
+                'active': 'Active',
+                'completed': 'Terminée',
+                'cancelled': 'Annulée'
+            };
+            return labels[status] || status;
+        }
+
+        function calculateDuration(startTimestamp) {
+            const now = Date.now();
+            const start = startTimestamp * 1000;
+            const diff = now - start;
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            return `${hours}h ${minutes}min`;
+        }
+
+        async function downloadInvoice(reservationId) {
+            try {
+                const response = await reservationAPI.getInvoice(reservationId);
+                showAlert('Facture téléchargée avec succès', 'success');
+                // Ici tu pourrais implémenter le téléchargement du PDF
+            } catch (error) {
+                showAlert('Erreur lors du téléchargement de la facture', 'error');
+            }
+        }
+
+        async function exitParking(stationnementId) {
+            if (!confirm('Voulez-vous vraiment sortir du parking ?')) {
+                return;
+            }
+
+            try {
+                await stationnementAPI.exit(stationnementId);
+                showAlert('Sortie enregistrée avec succès', 'success');
+                loadStationnements();
+                loadReservations();
+            } catch (error) {
+                showAlert('Erreur lors de la sortie', 'error');
+            }
+        }
+
+        // Charger les données au chargement
+        window.addEventListener('load', () => {
+            loadReservations();
+            loadStationnements();
+        });
+    </script>
+</body>
+</html>

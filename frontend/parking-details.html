@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Détails du parking - Smart Parking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Smart Parking</div>
+        <ul>
+            <li><a href="index.html">Rechercher</a></li>
+            <li><a href="my-reservations.html">Mes réservations</a></li>
+            <li><a href="#" id="logout-btn">Déconnexion</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div id="alert-container"></div>
+
+        <div class="card" id="parking-details-card">
+            <div id="loading" class="loading">
+                <div class="spinner"></div>
+                <p>Chargement...</p>
+            </div>
+        </div>
+
+        <div class="card" id="reservation-card" style="display: none;">
+            <h2>Réserver une place</h2>
+
+            <form id="reservation-form">
+                <div class="form-group">
+                    <label for="start-date">Date et heure de début</label>
+                    <input type="datetime-local" id="start-date" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="end-date">Date et heure de fin</label>
+                    <input type="datetime-local" id="end-date" required>
+                </div>
+
+                <div id="price-estimate" class="alert alert-info" style="display: none;"></div>
+
+                <button type="submit" class="btn btn-primary btn-block">
+                    Confirmer la réservation
+                </button>
+            </form>
+        </div>
+
+        <div class="card" id="subscriptions-card" style="display: none;">
+            <h2>Abonnements disponibles</h2>
+            <div id="subscriptions-list"></div>
+        </div>
+
+        <div class="card" id="actions-card" style="display: none;">
+            <h2>Actions rapides</h2>
+            <button class="btn btn-primary btn-block" id="enter-btn">
+                Entrer dans le parking
+            </button>
+            <div id="current-stationnement" style="margin-top: 1rem;"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        if (!authAPI.isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = authAPI.getUser();
+        const alertContainer = document.getElementById('alert-container');
+        const parkingDetailsCard = document.getElementById('parking-details-card');
+        const reservationCard = document.getElementById('reservation-card');
+        const subscriptionsCard = document.getElementById('subscriptions-card');
+        const actionsCard = document.getElementById('actions-card');
+        const loadingDiv = document.getElementById('loading');
+
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            authAPI.logout();
+        });
+
+        function showAlert(message, type = 'info') {
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertContainer.innerHTML = '', 5000);
+        }
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const parkingId = urlParams.get('id');
+
+        if (!parkingId) {
+            showAlert('Aucun parking sélectionné', 'error');
+            setTimeout(() => window.location.href = 'index.html', 2000);
+        }
+
+        let currentParking = null;
+
+        async function loadParkingDetails() {
+            try {
+                const data = await parkingAPI.getDetails(parkingId);
+                currentParking = data.parking;
+                displayParkingDetails(currentParking);
+
+                reservationCard.style.display = 'block';
+                actionsCard.style.display = 'block';
+
+                await loadSubscriptions();
+            } catch (error) {
+                showAlert('Erreur lors du chargement des détails', 'error');
+                parkingDetailsCard.innerHTML = `
+                    <p style="text-align: center; color: #666;">
+                        Impossible de charger les détails du parking
+                    </p>
+                    <a href="index.html" class="btn btn-secondary btn-block">Retour à la recherche</a>
+                `;
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function displayParkingDetails(parking) {
+            parkingDetailsCard.innerHTML = `
+                <h2>${parking.nom || 'Parking'}</h2>
+                <div style="margin-top: 1rem;">
+                    <p><strong>Adresse:</strong> ${parking.adresse || 'Non disponible'}</p>
+                    <p><strong>Places totales:</strong> ${parking.nb_places || 'N/A'}</p>
+                    <p><strong>Places disponibles:</strong> <span id="available-spots">${parking.places_disponibles || parking.nb_places || 'N/A'}</span></p>
+                    <p><strong>Tarif horaire:</strong> ${parking.tarif_horaire || '2.50'}€/h</p>
+                    <p><strong>Coordonnées GPS:</strong> ${parking.latitude || 'N/A'}, ${parking.longitude || 'N/A'}</p>
+                    <p><strong>Horaires:</strong> ${parking.horaires || '24h/24'}</p>
+                </div>
+            `;
+        }
+
+        async function loadSubscriptions() {
+            try {
+                const data = await parkingAPI.getSubscriptions(parkingId);
+                if (data.subscriptions && data.subscriptions.length > 0) {
+                    subscriptionsCard.style.display = 'block';
+                    displaySubscriptions(data.subscriptions);
+                }
+            } catch (error) {
+                console.error('Erreur chargement abonnements:', error);
+            }
+        }
+
+        function displaySubscriptions(subscriptions) {
+            const html = subscriptions.map(sub => `
+                <div class="parking-card" style="margin-bottom: 1rem;">
+                    <h3>${sub.nom || 'Abonnement'}</h3>
+                    <p>${sub.description || ''}</p>
+                    <p><strong>Prix:</strong> ${sub.prix || 'N/A'}€/mois</p>
+                    <p><strong>Créneaux:</strong> ${sub.creneaux || 'Accès illimité'}</p>
+                    <button class="btn btn-primary" onclick="subscribeToplan('${sub.id}')">
+                        Souscrire
+                    </button>
+                </div>
+            `).join('');
+
+            document.getElementById('subscriptions-list').innerHTML = html;
+        }
+
+        const reservationForm = document.getElementById('reservation-form');
+        const startDateInput = document.getElementById('start-date');
+        const endDateInput = document.getElementById('end-date');
+        const priceEstimate = document.getElementById('price-estimate');
+
+        function calculateEstimate() {
+            const start = new Date(startDateInput.value);
+            const end = new Date(endDateInput.value);
+
+            if (!start || !end || end <= start) {
+                priceEstimate.style.display = 'none';
+                return;
+            }
+
+            const hours = (end - start) / (1000 * 60 * 60);
+            const tarif = currentParking?.tarif_horaire || 2.50;
+            const estimate = (hours * tarif).toFixed(2);
+
+            priceEstimate.style.display = 'block';
+            priceEstimate.textContent = `Estimation: ${estimate}€ pour ${hours.toFixed(1)}h`;
+        }
+
+        startDateInput.addEventListener('change', calculateEstimate);
+        endDateInput.addEventListener('change', calculateEstimate);
+
+        reservationForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const startDate = new Date(startDateInput.value);
+            const endDate = new Date(endDateInput.value);
+
+            if (endDate <= startDate) {
+                showAlert('La date de fin doit être après la date de début', 'error');
+                return;
+            }
+
+            try {
+                await reservationAPI.create({
+                    user_id: user.id,
+                    parking_id: parkingId,
+                    start_time: Math.floor(startDate.getTime() / 1000),
+                    end_time: Math.floor(endDate.getTime() / 1000)
+                });
+
+                showAlert('Réservation créée avec succès', 'success');
+                setTimeout(() => window.location.href = 'my-reservations.html', 2000);
+            } catch (error) {
+                showAlert(error.message || 'Erreur lors de la réservation', 'error');
+            }
+        });
+
+        document.getElementById('enter-btn').addEventListener('click', async () => {
+            try {
+                const data = await parkingAPI.enter(parkingId);
+                showAlert('Entrée enregistrée avec succès', 'success');
+
+                document.getElementById('current-stationnement').innerHTML = `
+                    <div class="alert alert-success">
+                        <p><strong>Stationnement en cours</strong></p>
+                        <p>Début: ${new Date().toLocaleString()}</p>
+                        <a href="my-stationnements.html" class="btn btn-secondary" style="margin-top: 0.5rem;">
+                            Voir mes stationnements
+                        </a>
+                    </div>
+                `;
+            } catch (error) {
+                showAlert(error.message || 'Erreur lors de l\'entrée', 'error');
+            }
+        });
+
+        window.subscribeToplan = async function(subscriptionId) {
+            try {
+                await subscriptionAPI.subscribe({
+                    user_id: user.id,
+                    subscription_type_id: subscriptionId,
+                    parking_id: parkingId
+                });
+
+                showAlert('Abonnement souscrit avec succès', 'success');
+                setTimeout(() => window.location.href = 'my-subscriptions.html', 2000);
+            } catch (error) {
+                showAlert(error.message || 'Erreur lors de la souscription', 'error');
+            }
+        };
+
+        loadParkingDetails();
+    </script>
+</body>
+</html>
