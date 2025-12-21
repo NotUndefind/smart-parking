@@ -287,9 +287,9 @@ $ownerController = new OwnerApiController(
     authMiddleware: $authMiddleware
 );
 
-// ============================================================================
+$userController = new UserApiController();
+
 // Router
-// ============================================================================
-$router = new ApiRouter($authController, $userController, $ownerController);
+$router = new ApiRouter($authController, $ownerController, $userController);
 
 return $router;
