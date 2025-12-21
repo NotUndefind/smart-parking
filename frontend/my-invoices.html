@@ -57,8 +57,23 @@
             loadingDiv.style.display = 'block';
 
             try {
+                // Note: La route GET /users/{id}/invoices n'existe pas encore côté backend
+                // Affichage d'un message temporaire
+                invoicesContainer.innerHTML = `
+                    <div style="padding: 1rem; background: #fff3cd; border-radius: 4px; border-left: 4px solid #ffc107;">
+                        <p style="margin: 0; color: #856404;"><strong>Information:</strong> La liste de vos factures s'affichera ici une fois la route backend <code>GET /api/users/{id}/invoices</code> implémentée.</p>
+                        <p style="margin: 0.5rem 0 0 0; color: #856404;">Les factures sont générées après chaque réservation ou stationnement.</p>
+                    </div>
+                    <a href="my-reservations.html" class="btn btn-primary btn-block" style="margin-top: 1rem;">
+                        Voir mes réservations
+                    </a>
+                `;
+
+                // Code à activer une fois la route disponible:
+                /*
                 const response = await invoiceAPI.getUserInvoices(user.id);
                 displayInvoices(response.invoices || []);
+                */
             } catch (error) {
                 showAlert('Erreur lors du chargement des factures', 'error');
                 invoicesContainer.innerHTML = '<p>Aucune facture trouvée</p>';
