@@ -166,7 +166,7 @@
                                     ${!stat.heure_sortie ? `
                                         <button
                                             class="btn btn-danger"
-                                            onclick="exitParking('${stat.id}')"
+                                            onclick="exitParking('${stat.parking_id}')"
                                         >
                                             Sortir
                                         </button>
@@ -217,13 +217,13 @@
             }
         }
 
-        async function exitParking(stationnementId) {
+        async function exitParking(parkingId) {
             if (!confirm('Voulez-vous vraiment sortir du parking ?')) {
                 return;
             }
 
             try {
-                await stationnementAPI.exit(stationnementId);
+                await stationnementAPI.exitParking(parkingId);
                 showAlert('Sortie enregistrée avec succès', 'success');
                 loadStationnements();
                 loadReservations();
