@@ -111,7 +111,7 @@ const reservationAPI = {
     },
 
     async getUserReservations(userId) {
-        return await apiCall(`/users/${userId}/reservations`, 'GET');
+        return await apiCall('/user/reservations', 'GET');
     }
 };
 
@@ -126,12 +126,12 @@ const subscriptionAPI = {
 };
 
 const stationnementAPI = {
-    async exit(stationnementId) {
-        return await apiCall(`/stationnements/${stationnementId}/exit`, 'POST');
+    async exitParking(parkingId) {
+        return await apiCall(`/parkings/${parkingId}/exit`, 'POST');
     },
 
     async getUserStationnements(userId) {
-        return await apiCall(`/users/${userId}/stationnements`, 'GET');
+        return await apiCall('/user/stationnements', 'GET');
     }
 };
 

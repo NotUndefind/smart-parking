@@ -108,7 +108,7 @@
                     <button
                         class="btn btn-danger btn-block"
                         style="margin-top: 1rem;"
-                        onclick="exitParking('${stationnement.id}')"
+                        onclick="exitParking('${stationnement.parking_id}')"
                     >
                         Sortir du parking
                     </button>
@@ -202,13 +202,13 @@
             return (hours * tarif).toFixed(2);
         }
 
-        async function exitParking(stationnementId) {
+        async function exitParking(parkingId) {
             if (!confirm('Voulez-vous vraiment sortir du parking ?')) {
                 return;
             }
 
             try {
-                const response = await stationnementAPI.exit(stationnementId);
+                const response = await stationnementAPI.exitParking(parkingId);
                 showAlert('Sortie enregistrée avec succès', 'success');
 
                 if (response.facture) {
