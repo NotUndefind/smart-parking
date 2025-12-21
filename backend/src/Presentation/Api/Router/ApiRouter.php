@@ -28,29 +28,26 @@ final class ApiRouter
     {
         // Nettoyer l'URI (enlever les query params)
         $uri = parse_url($uri, PHP_URL_PATH);
-        $uri = rtrim($uri, '/');
+        $uri = rtrim($uri, "/");
 
-        // Enlever le préfixe /api pour simplifier le matching
-        $path = preg_replace('#^/api#', '', $uri);
-
-        // Routes Auth (User)
-        if ($method === 'POST' && $path === '/auth/register') {
+        // Routes d'authentification utilisateur
+        if ($uri === "/api/auth/register" && $method === "POST") {
             $this->authController->register();
             return;
         }
 
-        if ($method === 'POST' && $path === '/auth/login') {
+        if ($uri === "/api/auth/login" && $method === "POST") {
             $this->authController->login();
             return;
         }
 
-        // Routes Auth (Owner)
-        if ($method === 'POST' && $path === '/owner/register') {
+        // Routes d'authentification propriétaire
+        if ($uri === "/api/owner/register" && $method === "POST") {
             $this->ownerController->register();
             return;
         }
 
-        if ($method === 'POST' && $path === '/owner/login') {
+        if ($uri === "/api/owner/login" && $method === "POST") {
             $this->ownerController->login();
             return;
         }
@@ -117,13 +114,12 @@ final class ApiRouter
         }
 
         // Route par défaut
-        header('Content-Type: application/json');
+        header("Content-Type: application/json");
         http_response_code(404);
         echo json_encode([
-            'error' => 'Route non trouvée',
-            'method' => $method,
-            'uri' => $uri,
-            'path' => $path
+            "error" => "Route not found",
+            "method" => $method,
+            "uri" => $uri,
         ]);
     }
 }
