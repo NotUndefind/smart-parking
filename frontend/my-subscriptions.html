@@ -57,8 +57,23 @@
             loadingDiv.style.display = 'block';
 
             try {
+                // Note: La route GET /users/{id}/subscriptions n'existe pas encore côté backend
+                // Affichage d'un message temporaire
+                subscriptionsContainer.innerHTML = `
+                    <div style="padding: 1rem; background: #fff3cd; border-radius: 4px; border-left: 4px solid #ffc107;">
+                        <p style="margin: 0; color: #856404;"><strong>Information:</strong> La liste de vos abonnements s'affichera ici une fois la route backend <code>GET /api/users/{id}/subscriptions</code> implémentée.</p>
+                        <p style="margin: 0.5rem 0 0 0; color: #856404;">Vous pouvez souscrire à un abonnement depuis la page de détails d'un parking.</p>
+                    </div>
+                    <a href="index.html" class="btn btn-primary btn-block" style="margin-top: 1rem;">
+                        Rechercher un parking
+                    </a>
+                `;
+
+                // Code à activer une fois la route disponible:
+                /*
                 const response = await subscriptionAPI.getUserSubscriptions(user.id);
                 displaySubscriptions(response.subscriptions || []);
+                */
             } catch (error) {
                 showAlert('Erreur lors du chargement des abonnements', 'error');
                 subscriptionsContainer.innerHTML = '<p>Aucun abonnement trouvé</p>';
@@ -83,14 +98,20 @@
             const html = subscriptions.map(sub => `
                 <div class="parking-card" style="margin-bottom: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
-                        <div>
+                        <div style="flex: 1;">
                             <h3>${sub.parking_nom || 'Parking'}</h3>
-                            <p><strong>Type:</strong> ${sub.type_nom || sub.type || 'Abonnement'}</p>
-                            <p><strong>Créneaux:</strong> ${sub.creneaux || 'Accès illimité'}</p>
+                            <p><strong>Type:</strong> ${getSubscriptionTypeName(sub.type || sub.type_nom)}</p>
+                            <p><strong>Durée:</strong> ${getDurationFromDates(sub.date_debut, sub.date_fin)}</p>
                             <p><strong>Début:</strong> ${formatDate(sub.date_debut)}</p>
                             <p><strong>Fin:</strong> ${formatDate(sub.date_fin)}</p>
-                            <p><strong>Prix:</strong> ${sub.prix || 'N/A'}€</p>
-                            <span class="status-badge status-${sub.statut}">
+                            <p><strong>Prix payé:</strong> ${sub.prix || 'N/A'}€</p>
+
+                            <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;">
+                                <strong>Créneaux horaires:</strong>
+                                ${formatTimeSlots(sub.time_slots || sub.creneaux)}
+                            </div>
+
+                            <span class="status-badge status-${sub.statut}" style="margin-top: 0.5rem; display: inline-block;">
                                 ${getStatusLabel(sub.statut)}
                             </span>
                         </div>
@@ -106,6 +127,66 @@
             `).join('');
 
             subscriptionsContainer.innerHTML = html;
+        }
+
+        function getSubscriptionTypeName(type) {
+            const types = {
+                'monthly': 'Mensuel Total',
+                'weekend': 'Week-end',
+                'evening': 'Soirée',
+                'custom': 'Personnalisé',
+                'quarterly': 'Trimestriel',
+                'yearly': 'Annuel'
+            };
+            return types[type] || type || 'Standard';
+        }
+
+        function getDurationFromDates(startTimestamp, endTimestamp) {
+            if (!startTimestamp || !endTimestamp) return 'N/A';
+            const days = Math.floor((endTimestamp - startTimestamp) / (60 * 60 * 24));
+            if (days >= 365) return `${Math.floor(days / 365)} an(s)`;
+            if (days >= 30) return `${Math.floor(days / 30)} mois`;
+            return `${days} jours`;
+        }
+
+        function formatTimeSlots(slots) {
+            if (!slots) return '<p style="margin: 0.25rem 0;">Accès illimité 24h/24, 7j/7</p>';
+
+            if (typeof slots === 'string') {
+                return `<p style="margin: 0.25rem 0;">${slots}</p>`;
+            }
+
+            if (Array.isArray(slots)) {
+                return slots.map(slot => {
+                    if (typeof slot === 'string') {
+                        return `<p style="margin: 0.25rem 0;">${slot}</p>`;
+                    }
+
+                    const dayLabel = getDayLabel(slot.day);
+                    const startTime = slot.start_time || '00:00';
+                    const endTime = slot.end_time || '23:59';
+
+                    return `<p style="margin: 0.25rem 0;">• ${dayLabel}: ${startTime} - ${endTime}</p>`;
+                }).join('');
+            }
+
+            return '<p style="margin: 0.25rem 0;">Accès illimité 24h/24, 7j/7</p>';
+        }
+
+        function getDayLabel(day) {
+            const labels = {
+                'all': 'Tous les jours',
+                'weekdays': 'Lun-Ven',
+                'weekend': 'Sam-Dim',
+                'monday': 'Lundi',
+                'tuesday': 'Mardi',
+                'wednesday': 'Mercredi',
+                'thursday': 'Jeudi',
+                'friday': 'Vendredi',
+                'saturday': 'Samedi',
+                'sunday': 'Dimanche'
+            };
+            return labels[day] || day;
         }
 
         function formatDate(timestamp) {
