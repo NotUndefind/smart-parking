@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes stationnements - Smart Parking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Smart Parking</div>
+        <ul>
+            <li><a href="index.html">Rechercher</a></li>
+            <li><a href="my-reservations.html">Mes réservations</a></li>
+            <li><a href="my-subscriptions.html">Mes abonnements</a></li>
+            <li><a href="#" id="logout-btn">Déconnexion</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Stationnement en cours</h2>
+            <div id="current-stationnement-container"></div>
+        </div>
+
+        <div class="card">
+            <h2>Historique des stationnements</h2>
+
+            <div id="alert-container"></div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Chargement de l'historique...</p>
+            </div>
+
+            <div id="history-container"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        if (!authAPI.isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = authAPI.getUser();
+        const alertContainer = document.getElementById('alert-container');
+        const currentContainer = document.getElementById('current-stationnement-container');
+        const historyContainer = document.getElementById('history-container');
+        const loadingDiv = document.getElementById('loading');
+
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            authAPI.logout();
+        });
+
+        function showAlert(message, type = 'info') {
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertContainer.innerHTML = '', 5000);
+        }
+
+        async function loadStationnements() {
+            loadingDiv.style.display = 'block';
+
+            try {
+                const response = await stationnementAPI.getUserStationnements(user.id);
+                const stationnements = response.stationnements || [];
+
+                const current = stationnements.filter(s => !s.heure_sortie);
+                const history = stationnements.filter(s => s.heure_sortie);
+
+                displayCurrentStationnement(current[0]);
+                displayHistory(history);
+            } catch (error) {
+                showAlert('Erreur lors du chargement des stationnements', 'error');
+                historyContainer.innerHTML = '<p>Aucun stationnement trouvé</p>';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function displayCurrentStationnement(stationnement) {
+            if (!stationnement) {
+                currentContainer.innerHTML = `
+                    <p style="text-align: center; color: #666;">
+                        Aucun stationnement en cours
+                    </p>
+                `;
+                return;
+            }
+
+            const duration = calculateDuration(stationnement.heure_entree);
+            const estimatedCost = calculateEstimatedCost(stationnement);
+
+            currentContainer.innerHTML = `
+                <div class="alert alert-info">
+                    <h3>${stationnement.parking_nom || 'Parking'}</h3>
+                    <p><strong>Entrée:</strong> ${formatDateTime(stationnement.heure_entree)}</p>
+                    <p><strong>Durée:</strong> ${duration}</p>
+                    <p><strong>Coût estimé:</strong> ${estimatedCost}€</p>
+                    ${stationnement.has_reservation ? `
+                        <p><strong>Réservation:</strong> Oui</p>
+                    ` : `
+                        <p class="alert alert-warning" style="margin-top: 0.5rem;">
+                            Attention: Pas de réservation active
+                        </p>
+                    `}
+                    <button
+                        class="btn btn-danger btn-block"
+                        style="margin-top: 1rem;"
+                        onclick="exitParking('${stationnement.id}')"
+                    >
+                        Sortir du parking
+                    </button>
+                </div>
+            `;
+        }
+
+        function displayHistory(stationnements) {
+            if (stationnements.length === 0) {
+                historyContainer.innerHTML = `
+                    <p style="text-align: center; color: #666;">
+                        Aucun historique de stationnement
+                    </p>
+                `;
+                return;
+            }
+
+            const html = `
+                <table class="reservations-table">
+                    <thead>
+                        <tr>
+                            <th>Parking</th>
+                            <th>Entrée</th>
+                            <th>Sortie</th>
+                            <th>Durée</th>
+                            <th>Coût</th>
+                            <th>Pénalité</th>
+                            <th>Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${stationnements.map(stat => {
+                            const duration = calculateCompletedDuration(stat.heure_entree, stat.heure_sortie);
+                            const hasPenalty = stat.penalite > 0;
+
+                            return `
+                                <tr>
+                                    <td>${stat.parking_nom || 'Parking'}</td>
+                                    <td>${formatDateTime(stat.heure_entree)}</td>
+                                    <td>${formatDateTime(stat.heure_sortie)}</td>
+                                    <td>${duration}</td>
+                                    <td>${stat.cout_base || '0.00'}€</td>
+                                    <td ${hasPenalty ? 'style="color: #e74c3c; font-weight: bold;"' : ''}>
+                                        ${stat.penalite || '0.00'}€
+                                    </td>
+                                    <td><strong>${stat.cout_total || '0.00'}€</strong></td>
+                                </tr>
+                            `;
+                        }).join('')}
+                    </tbody>
+                </table>
+            `;
+
+            historyContainer.innerHTML = html;
+        }
+
+        function formatDateTime(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleString('fr-FR');
+        }
+
+        function calculateDuration(startTimestamp) {
+            const now = Date.now();
+            const start = startTimestamp * 1000;
+            const diff = now - start;
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            return `${hours}h ${minutes}min`;
+        }
+
+        function calculateCompletedDuration(startTimestamp, endTimestamp) {
+            const start = startTimestamp * 1000;
+            const end = endTimestamp * 1000;
+            const diff = end - start;
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+            return `${hours}h ${minutes}min`;
+        }
+
+        function calculateEstimatedCost(stationnement) {
+            const now = Date.now() / 1000;
+            const start = stationnement.heure_entree;
+            const hours = (now - start) / 3600;
+            const tarif = stationnement.tarif_horaire || 2.50;
+
+            return (hours * tarif).toFixed(2);
+        }
+
+        async function exitParking(stationnementId) {
+            if (!confirm('Voulez-vous vraiment sortir du parking ?')) {
+                return;
+            }
+
+            try {
+                const response = await stationnementAPI.exit(stationnementId);
+                showAlert('Sortie enregistrée avec succès', 'success');
+
+                if (response.facture) {
+                    showAlert(`Coût total: ${response.facture.montant_total}€`, 'info');
+                }
+
+                setTimeout(() => loadStationnements(), 1000);
+            } catch (error) {
+                showAlert(error.message || 'Erreur lors de la sortie', 'error');
+            }
+        }
+
+        window.addEventListener('load', () => {
+            loadStationnements();
+            setInterval(loadStationnements, 30000);
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mes abonnements - Smart Parking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Smart Parking</div>
+        <ul>
+            <li><a href="index.html">Rechercher</a></li>
+            <li><a href="my-reservations.html">Mes réservations</a></li>
+            <li><a href="my-subscriptions.html">Mes abonnements</a></li>
+            <li><a href="#" id="logout-btn">Déconnexion</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Mes abonnements</h2>
+
+            <div id="alert-container"></div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Chargement de vos abonnements...</p>
+            </div>
+
+            <div id="subscriptions-container"></div>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        if (!authAPI.isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = authAPI.getUser();
+        const alertContainer = document.getElementById('alert-container');
+        const subscriptionsContainer = document.getElementById('subscriptions-container');
+        const loadingDiv = document.getElementById('loading');
+
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            authAPI.logout();
+        });
+
+        function showAlert(message, type = 'info') {
+            alertContainer.innerHTML = `<div class="alert alert-${type}">${message}</div>`;
+            setTimeout(() => alertContainer.innerHTML = '', 5000);
+        }
+
+        async function loadSubscriptions() {
+            loadingDiv.style.display = 'block';
+
+            try {
+                const response = await subscriptionAPI.getUserSubscriptions(user.id);
+                displaySubscriptions(response.subscriptions || []);
+            } catch (error) {
+                showAlert('Erreur lors du chargement des abonnements', 'error');
+                subscriptionsContainer.innerHTML = '<p>Aucun abonnement trouvé</p>';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function displaySubscriptions(subscriptions) {
+            if (subscriptions.length === 0) {
+                subscriptionsContainer.innerHTML = `
+                    <p style="text-align: center; color: #666;">
+                        Vous n'avez aucun abonnement actif
+                    </p>
+                    <a href="index.html" class="btn btn-primary btn-block">
+                        Rechercher un parking
+                    </a>
+                `;
+                return;
+            }
+
+            const html = subscriptions.map(sub => `
+                <div class="parking-card" style="margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start;">
+                        <div>
+                            <h3>${sub.parking_nom || 'Parking'}</h3>
+                            <p><strong>Type:</strong> ${sub.type_nom || sub.type || 'Abonnement'}</p>
+                            <p><strong>Créneaux:</strong> ${sub.creneaux || 'Accès illimité'}</p>
+                            <p><strong>Début:</strong> ${formatDate(sub.date_debut)}</p>
+                            <p><strong>Fin:</strong> ${formatDate(sub.date_fin)}</p>
+                            <p><strong>Prix:</strong> ${sub.prix || 'N/A'}€</p>
+                            <span class="status-badge status-${sub.statut}">
+                                ${getStatusLabel(sub.statut)}
+                            </span>
+                        </div>
+                        <div>
+                            ${isActive(sub) ? `
+                                <a href="parking-details.html?id=${sub.parking_id}" class="btn btn-primary">
+                                    Voir le parking
+                                </a>
+                            ` : ''}
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+
+            subscriptionsContainer.innerHTML = html;
+        }
+
+        function formatDate(timestamp) {
+            if (!timestamp) return 'N/A';
+            const date = new Date(timestamp * 1000);
+            return date.toLocaleDateString('fr-FR');
+        }
+
+        function getStatusLabel(status) {
+            const labels = {
+                'active': 'Actif',
+                'expired': 'Expiré',
+                'cancelled': 'Annulé'
+            };
+            return labels[status] || status;
+        }
+
+        function isActive(subscription) {
+            const now = Date.now() / 1000;
+            return subscription.date_debut <= now && subscription.date_fin >= now;
+        }
+
+        window.addEventListener('load', () => {
+            loadSubscriptions();
+        });
+    </script>
+</body>
+</html>

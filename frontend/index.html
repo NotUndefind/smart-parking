@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rechercher un parking - Smart Parking</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <nav>
+        <div class="logo">Smart Parking</div>
+        <ul>
+            <li><a href="index.html">Rechercher</a></li>
+            <li><a href="my-reservations.html">Mes réservations</a></li>
+            <li><a href="my-subscriptions.html">Mes abonnements</a></li>
+            <li><a href="my-stationnements.html">Mes stationnements</a></li>
+            <li><a href="my-invoices.html">Mes factures</a></li>
+            <li><a href="#" id="logout-btn">Déconnexion</a></li>
+        </ul>
+    </nav>
+
+    <div class="container">
+        <div class="card">
+            <h2>Rechercher un parking</h2>
+
+            <div id="alert-container"></div>
+
+            <div class="form-group">
+                <label for="search-location">Recherche par localisation</label>
+                <input
+                    type="text"
+                    id="search-location"
+                    placeholder="Adresse ou utilisez votre position"
+                >
+            </div>
+
+            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+                <button class="btn btn-primary" onclick="useMyLocation()">
+                    Utiliser ma position
+                </button>
+                <button class="btn btn-secondary" onclick="searchParkings()">
+                    Rechercher
+                </button>
+            </div>
+
+            <div id="loading" class="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Recherche en cours...</p>
+            </div>
+        </div>
+
+        <div id="parkings-container"></div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        if (!authAPI.isAuthenticated()) {
+            window.location.href = 'login.html';
+        }
+
+        const user = authAPI.getUser();
+        const alertContainer = document.getElementById('alert-container');
+        const parkingsContainer = document.getElementById('parkings-container');
+        const loadingDiv = document.getElementById('loading');
+
+        // Logout
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
+            e.preventDefault();
+            authAPI.logout();
+        });
+
+        function showAlert(message, type = 'info') {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type}">
+                    ${message}
+                </div>
+            `;
+        }
+
+        let currentPosition = null;
+
+        function useMyLocation() {
+            loadingDiv.style.display = 'block';
+
+            if (!navigator.geolocation) {
+                showAlert('La géolocalisation n\'est pas supportée par votre navigateur', 'error');
+                loadingDiv.style.display = 'none';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async (position) => {
+                    currentPosition = {
+                        lat: position.coords.latitude,
+                        lng: position.coords.longitude
+                    };
+
+                    showAlert(`Position trouvée : ${currentPosition.lat.toFixed(4)}, ${currentPosition.lng.toFixed(4)}`, 'success');
+
+                    await loadParkings(currentPosition.lat, currentPosition.lng);
+                },
+                (error) => {
+                    showAlert('Impossible d\'obtenir votre position', 'error');
+                    loadingDiv.style.display = 'none';
+                }
+            );
+        }
+
+        async function searchParkings() {
+            if (!currentPosition) {
+                showAlert('Veuillez d\'abord activer votre position', 'error');
+                return;
+            }
+
+            await loadParkings(currentPosition.lat, currentPosition.lng);
+        }
+
+        async function loadParkings(lat, lng, radius = 5) {
+            loadingDiv.style.display = 'block';
+
+            try {
+                const response = await parkingAPI.search(lat, lng, radius);
+                displayParkings(response.parkings || []);
+            } catch (error) {
+                showAlert('Erreur lors de la recherche des parkings', 'error');
+                parkingsContainer.innerHTML = '';
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function displayParkings(parkings) {
+            if (parkings.length === 0) {
+                parkingsContainer.innerHTML = `
+                    <div class="card">
+                        <p style="text-align: center; color: #666;">
+                            Aucun parking trouvé dans cette zone
+                        </p>
+                    </div>
+                `;
+                return;
+            }
+
+            const html = `
+                <div class="parking-grid">
+                    ${parkings.map(parking => `
+                        <div class="parking-card">
+                            <h3>${parking.nom || 'Parking'}</h3>
+                            <p>${parking.adresse || 'Adresse non disponible'}</p>
+                            <p>Places: ${parking.nb_places || 'N/A'}</p>
+                            <p class="price">${parking.tarif_horaire || '2.50'}€/h</p>
+                            <button
+                                class="btn btn-primary btn-block"
+                                onclick="viewParkingDetails('${parking.id}')"
+                            >
+                                Voir les détails
+                            </button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
+
+            parkingsContainer.innerHTML = html;
+        }
+
+        function viewParkingDetails(parkingId) {
+            window.location.href = `parking-details.html?id=${parkingId}`;
+        }
+
+        window.addEventListener('load', () => {
+            showAlert('Bienvenue ' + (user?.prenom || user?.nom || 'utilisateur') + ' !', 'success');
+        });
+    </script>
+</body>
+</html>
