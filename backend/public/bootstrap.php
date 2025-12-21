@@ -44,7 +44,7 @@ use App\Infrastructure\Persistence\File\FileOwnerRepository;
 use App\Infrastructure\Persistence\File\FileUserRepository;
 use App\Infrastructure\Persistence\File\FileParkingRepository;
 use App\Infrastructure\Persistence\File\FileReservationRepository;
-use App\Infrastructure\Persistence\File\FileStationnementsRepository;
+use App\Infrastructure\Persistence\File\FileStationnementRepository;
 use App\Infrastructure\Persistence\File\FileSubscriptionRepository;
 
 // Infrastructure - Persistence SQL
@@ -52,7 +52,7 @@ use App\Infrastructure\Persistence\SQL\MySQLOwnerRepository;
 use App\Infrastructure\Persistence\SQL\MySQLUserRepository;
 use App\Infrastructure\Persistence\SQL\MySQLParkingRepository;
 use App\Infrastructure\Persistence\SQL\MySQLReservationRepository;
-use App\Infrastructure\Persistence\SQL\MySQLStationnementsRepository;
+use App\Infrastructure\Persistence\SQL\MySQLStationnementRepository;
 use App\Infrastructure\Persistence\SQL\MySQLSubscriptionRepository;
 
 // Infrastructure - Security
@@ -91,14 +91,14 @@ if ($storageType === 'sql') {
     $ownerRepository = new MySQLOwnerRepository($pdo);
     $parkingRepository = new MySQLParkingRepository($pdo);
     $reservationRepository = new MySQLReservationRepository($pdo);
-    $stationnementsRepository = new MySQLStationnementsRepository($pdo);
+    $stationnementsRepository = new MySQLStationnementRepository($pdo);
     $subscriptionRepository = new MySQLSubscriptionRepository($pdo);
 } else {
     $userRepository = new FileUserRepository();
     $ownerRepository = new FileOwnerRepository();
     $parkingRepository = new FileParkingRepository();
     $reservationRepository = new FileReservationRepository();
-    $stationnementsRepository = new FileStationnementsRepository();
+    $stationnementsRepository = new FileStationnementRepository();
     $subscriptionRepository = new FileSubscriptionRepository();
 }
 
@@ -136,7 +136,9 @@ $searchParkingsByLocationUseCase = new SearchParkingsByLocationUseCase(
 );
 
 $getParkingDetailsUseCase = new GetParkingDetailsUseCase(
-    parkingRepository: $parkingRepository
+    parkingRepository: $parkingRepository,
+    reservationRepository: $reservationRepository,
+    subscriptionRepository: $subscriptionRepository
 );
 
 $createReservationUseCase = new CreateReservationUseCase(
@@ -147,7 +149,8 @@ $createReservationUseCase = new CreateReservationUseCase(
 );
 
 $listUserReservationsUseCase = new ListUserReservationsUseCase(
-    reservationRepository: $reservationRepository
+    reservationRepository: $reservationRepository,
+    parkingRepository: $parkingRepository
 );
 
 $listAvailableSubscriptionsUseCase = new ListAvailableSubscriptionsUseCase(
@@ -163,22 +166,25 @@ $subscribeToPlanUseCase = new SubscribeToPlanUseCase(
 $enterParkingUseCase = new EnterParkingUseCase(
     userRepository: $userRepository,
     parkingRepository: $parkingRepository,
-    stationnementsRepository: $stationnementsRepository,
     reservationRepository: $reservationRepository,
-    subscriptionRepository: $subscriptionRepository
+    subscriptionRepository: $subscriptionRepository,
+    stationnementRepository: $stationnementsRepository
 );
 
 $exitParkingUseCase = new ExitParkingUseCase(
-    stationnementsRepository: $stationnementsRepository,
-    parkingRepository: $parkingRepository
+    stationnementRepository: $stationnementsRepository,
+    parkingRepository: $parkingRepository,
+    reservationRepository: $reservationRepository
 );
 
 $listUserStationnementsUseCase = new ListUserStationnementsUseCase(
-    stationnementsRepository: $stationnementsRepository
+    stationnementRepository: $stationnementsRepository,
+    parkingRepository: $parkingRepository
 );
 
 $generateInvoiceUseCase = new GenerateInvoiceUseCase(
-    stationnementsRepository: $stationnementsRepository,
+    stationnementRepository: $stationnementsRepository,
+    parkingRepository: $parkingRepository,
     userRepository: $userRepository
 );
 
@@ -204,50 +210,44 @@ $createParkingUseCase = new CreateParkingUseCase(
 );
 
 $updateParkingTariffUseCase = new UpdateParkingTariffUseCase(
-    parkingRepository: $parkingRepository,
-    ownerRepository: $ownerRepository
+    parkingRepository: $parkingRepository
 );
 
 $updateParkingScheduleUseCase = new UpdateParkingScheduleUseCase(
-    parkingRepository: $parkingRepository,
-    ownerRepository: $ownerRepository
+    parkingRepository: $parkingRepository
 );
 
 $addSubscriptionTypeUseCase = new AddSubscriptionTypeUseCase(
-    parkingRepository: $parkingRepository,
-    ownerRepository: $ownerRepository
+    parkingRepository: $parkingRepository
 );
 
 $listParkingReservationsUseCase = new ListParkingReservationsUseCase(
-    parkingRepository: $parkingRepository,
     reservationRepository: $reservationRepository,
-    ownerRepository: $ownerRepository
+    parkingRepository: $parkingRepository
 );
 
 $listParkingStationnementsUseCase = new ListParkingStationnementsUseCase(
-    parkingRepository: $parkingRepository,
-    stationnementsRepository: $stationnementsRepository,
-    ownerRepository: $ownerRepository
+    stationnementRepository: $stationnementsRepository,
+    parkingRepository: $parkingRepository
 );
 
 $getAvailableSpotsAtTimeUseCase = new GetAvailableSpotsAtTimeUseCase(
     parkingRepository: $parkingRepository,
     reservationRepository: $reservationRepository,
-    stationnementsRepository: $stationnementsRepository,
-    ownerRepository: $ownerRepository
+    subscriptionRepository: $subscriptionRepository
 );
 
 $getMonthlyRevenueUseCase = new GetMonthlyRevenueUseCase(
     parkingRepository: $parkingRepository,
     reservationRepository: $reservationRepository,
-    subscriptionRepository: $subscriptionRepository,
-    ownerRepository: $ownerRepository
+    stationnementRepository: $stationnementsRepository,
+    subscriptionRepository: $subscriptionRepository
 );
 
 $listOverstayingUsersUseCase = new ListOverstayingUsersUseCase(
     parkingRepository: $parkingRepository,
-    stationnementsRepository: $stationnementsRepository,
-    ownerRepository: $ownerRepository
+    stationnementRepository: $stationnementsRepository,
+    reservationRepository: $reservationRepository
 );
 
 // ============================================================================
@@ -286,8 +286,6 @@ $ownerController = new OwnerApiController(
     listOverstayingUsersUseCase: $listOverstayingUsersUseCase,
     authMiddleware: $authMiddleware
 );
-
-$userController = new UserApiController();
 
 // Router
 $router = new ApiRouter($authController, $ownerController, $userController);
