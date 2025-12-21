@@ -403,15 +403,27 @@
         parkingForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
+            const tarifHoraire = parseFloat(document.getElementById('tarif_horaire').value);
+            const horairesTexte = document.getElementById('horaires').value;
+
             const parkingData = {
-                owner_id: owner.id,
-                nom: document.getElementById('nom').value,
-                adresse: document.getElementById('adresse').value,
+                name: document.getElementById('nom').value,
+                address: document.getElementById('adresse').value,
                 latitude: parseFloat(document.getElementById('latitude').value),
                 longitude: parseFloat(document.getElementById('longitude').value),
-                nb_places: parseInt(document.getElementById('nb_places').value),
-                tarif_horaire: parseFloat(document.getElementById('tarif_horaire').value),
-                horaires: document.getElementById('horaires').value
+                total_spots: parseInt(document.getElementById('nb_places').value),
+                tariffs: [
+                    {
+                        duration: 60,
+                        price: tarifHoraire
+                    }
+                ],
+                schedule: [
+                    {
+                        day: 'all',
+                        hours: horairesTexte
+                    }
+                ]
             };
 
             try {
@@ -424,8 +436,10 @@
                     body: JSON.stringify(parkingData)
                 });
 
+                const data = await response.json();
+
                 if (!response.ok) {
-                    throw new Error('Erreur lors de la création');
+                    throw new Error(data.error || 'Erreur lors de la création');
                 }
 
                 showAlert('Parking créé avec succès', 'success');

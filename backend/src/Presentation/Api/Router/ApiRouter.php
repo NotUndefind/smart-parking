@@ -30,6 +30,9 @@ final class ApiRouter
         $uri = parse_url($uri, PHP_URL_PATH);
         $uri = rtrim($uri, "/");
 
+        // Enlever le préfixe /api pour simplifier le matching
+        $path = preg_replace('#^/api#', '', $uri);
+
         // Routes d'authentification utilisateur
         if ($uri === "/api/auth/register" && $method === "POST") {
             $this->authController->register();
@@ -49,6 +52,52 @@ final class ApiRouter
 
         if ($uri === "/api/owner/login" && $method === "POST") {
             $this->ownerController->login();
+            return;
+        }
+
+        // Routes Owner - Gestion des parkings
+        if ($method === 'POST' && $path === '/parkings') {
+            $this->ownerController->createParking();
+            return;
+        }
+
+        if ($method === 'PUT' && preg_match('#^/parkings/([^/]+)/tariff$#', $path, $matches)) {
+            $this->ownerController->updateParkingTariff($matches[1]);
+            return;
+        }
+
+        if ($method === 'PUT' && preg_match('#^/parkings/([^/]+)/schedule$#', $path, $matches)) {
+            $this->ownerController->updateParkingSchedule($matches[1]);
+            return;
+        }
+
+        if ($method === 'POST' && preg_match('#^/parkings/([^/]+)/subscription-types$#', $path, $matches)) {
+            $this->ownerController->addSubscriptionType($matches[1]);
+            return;
+        }
+
+        if ($method === 'GET' && preg_match('#^/parkings/([^/]+)/reservations$#', $path, $matches)) {
+            $this->ownerController->listParkingReservations($matches[1]);
+            return;
+        }
+
+        if ($method === 'GET' && preg_match('#^/parkings/([^/]+)/stationnements$#', $path, $matches)) {
+            $this->ownerController->listParkingStationnements($matches[1]);
+            return;
+        }
+
+        if ($method === 'GET' && preg_match('#^/parkings/([^/]+)/availability$#', $path, $matches)) {
+            $this->ownerController->getAvailableSpotsAtTime($matches[1]);
+            return;
+        }
+
+        if ($method === 'GET' && preg_match('#^/parkings/([^/]+)/revenue$#', $path, $matches)) {
+            $this->ownerController->getMonthlyRevenue($matches[1]);
+            return;
+        }
+
+        if ($method === 'GET' && preg_match('#^/parkings/([^/]+)/overstays$#', $path, $matches)) {
+            $this->ownerController->listOverstayingUsers($matches[1]);
             return;
         }
 
