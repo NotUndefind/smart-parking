@@ -57,23 +57,8 @@
             loadingDiv.style.display = 'block';
 
             try {
-                // Note: La route GET /users/{id}/subscriptions n'existe pas encore côté backend
-                // Affichage d'un message temporaire
-                subscriptionsContainer.innerHTML = `
-                    <div style="padding: 1rem; background: #fff3cd; border-radius: 4px; border-left: 4px solid #ffc107;">
-                        <p style="margin: 0; color: #856404;"><strong>Information:</strong> La liste de vos abonnements s'affichera ici une fois la route backend <code>GET /api/users/{id}/subscriptions</code> implémentée.</p>
-                        <p style="margin: 0.5rem 0 0 0; color: #856404;">Vous pouvez souscrire à un abonnement depuis la page de détails d'un parking.</p>
-                    </div>
-                    <a href="index.html" class="btn btn-primary btn-block" style="margin-top: 1rem;">
-                        Rechercher un parking
-                    </a>
-                `;
-
-                // Code à activer une fois la route disponible:
-                /*
                 const response = await subscriptionAPI.getUserSubscriptions(user.id);
                 displaySubscriptions(response.subscriptions || []);
-                */
             } catch (error) {
                 showAlert('Erreur lors du chargement des abonnements', 'error');
                 subscriptionsContainer.innerHTML = '<p>Aucun abonnement trouvé</p>';
@@ -99,24 +84,24 @@
                 <div class="parking-card" style="margin-bottom: 1rem;">
                     <div style="display: flex; justify-content: space-between; align-items: start;">
                         <div style="flex: 1;">
-                            <h3>${sub.parking_nom || 'Parking'}</h3>
-                            <p><strong>Type:</strong> ${getSubscriptionTypeName(sub.type || sub.type_nom)}</p>
-                            <p><strong>Durée:</strong> ${getDurationFromDates(sub.date_debut, sub.date_fin)}</p>
-                            <p><strong>Début:</strong> ${formatDate(sub.date_debut)}</p>
-                            <p><strong>Fin:</strong> ${formatDate(sub.date_fin)}</p>
-                            <p><strong>Prix payé:</strong> ${sub.prix || 'N/A'}€</p>
+                            <h3>${sub.parking_name || 'Parking'}</h3>
+                            <p><strong>Type:</strong> ${getSubscriptionTypeName(sub.type)}</p>
+                            <p><strong>Durée:</strong> ${getDurationFromDates(sub.start_date, sub.end_date)}</p>
+                            <p><strong>Début:</strong> ${formatDate(sub.start_date)}</p>
+                            <p><strong>Fin:</strong> ${formatDate(sub.end_date)}</p>
+                            <p><strong>Prix payé:</strong> ${sub.price || 'N/A'}€</p>
 
                             <div style="margin-top: 0.5rem; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;">
                                 <strong>Créneaux horaires:</strong>
-                                ${formatTimeSlots(sub.time_slots || sub.creneaux)}
+                                ${formatTimeSlots(sub.time_slots)}
                             </div>
 
-                            <span class="status-badge status-${sub.statut}" style="margin-top: 0.5rem; display: inline-block;">
-                                ${getStatusLabel(sub.statut)}
+                            <span class="status-badge status-${sub.is_active ? 'active' : 'expired'}" style="margin-top: 0.5rem; display: inline-block;">
+                                ${sub.is_active ? 'Actif' : 'Expiré'}
                             </span>
                         </div>
                         <div>
-                            ${isActive(sub) ? `
+                            ${sub.is_active ? `
                                 <a href="parking-details.html?id=${sub.parking_id}" class="btn btn-primary">
                                     Voir le parking
                                 </a>
@@ -205,8 +190,7 @@
         }
 
         function isActive(subscription) {
-            const now = Date.now() / 1000;
-            return subscription.date_debut <= now && subscription.date_fin >= now;
+            return subscription.is_active === true;
         }
 
         window.addEventListener('load', () => {

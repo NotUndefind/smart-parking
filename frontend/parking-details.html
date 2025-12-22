@@ -192,6 +192,7 @@
                 actionsCard.style.display = 'block';
 
                 await loadSubscriptions();
+                await loadCurrentStationnement();
             } catch (error) {
                 console.error('Erreur chargement détails:', error);
                 console.error('Stack:', error.stack);
@@ -240,6 +241,40 @@
                 }
             } catch (error) {
                 console.error('Erreur chargement abonnements:', error);
+            }
+        }
+
+        async function loadCurrentStationnement() {
+            try {
+                const stationnementsResponse = await stationnementAPI.getUserStationnements(user.id);
+                const stationnements = stationnementsResponse.stationnements || [];
+                const currentStationnement = stationnements.find(s => !s.heure_sortie && s.parking_id === parkingId);
+
+                if (currentStationnement) {
+                    const entryDate = new Date(currentStationnement.heure_entree * 1000);
+                    const now = Date.now();
+                    const duration = Math.floor((now - entryDate.getTime()) / (1000 * 60));
+                    const hours = Math.floor(duration / 60);
+                    const minutes = duration % 60;
+                    const tarif = currentParking.tarif_horaire || 2.50;
+                    const estimatedCost = ((now - entryDate.getTime()) / (1000 * 60 * 60) * tarif).toFixed(2);
+
+                    document.getElementById('current-stationnement').innerHTML = `
+                        <div class="alert alert-success">
+                            <h3>${currentParking.nom || 'Parking'}</h3>
+                            <p><strong>Entrée:</strong> ${entryDate.toLocaleString('fr-FR')}</p>
+                            <p><strong>Durée:</strong> ${hours}h ${minutes}min</p>
+                            <p><strong>Coût estimé:</strong> ${estimatedCost}€</p>
+                            <a href="my-stationnements.html" class="btn btn-secondary" style="margin-top: 0.5rem;">
+                                Voir mes stationnements
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    console.log('Active stationnement not found');
+                }
+            } catch (error) {
+                console.error('Erreur chargement stationnement actif:', error);
             }
         }
 
@@ -356,18 +391,62 @@
 
         document.getElementById('enter-btn').addEventListener('click', async () => {
             try {
-                const data = await parkingAPI.enter(parkingId);
+                // Trouver une réservation active pour ce parking
+                const reservationsResponse = await reservationAPI.getUserReservations(user.id);
+                const reservations = reservationsResponse.reservations || [];
+                const now = Math.floor(Date.now() / 1000);
+
+                const activeReservation = reservations.find(r =>
+                    r.parking_id === parkingId &&
+                    r.statut === 'active' &&
+                    r.debut <= now &&
+                    r.fin >= now
+                );
+
+                if (!activeReservation) {
+                    showAlert('Aucune réservation active trouvée pour ce parking', 'error');
+                    return;
+                }
+
+                const data = await parkingAPI.enter(parkingId, activeReservation.id);
                 showAlert('Entrée enregistrée avec succès', 'success');
 
-                document.getElementById('current-stationnement').innerHTML = `
-                    <div class="alert alert-success">
-                        <p><strong>Stationnement en cours</strong></p>
-                        <p>Début: ${new Date().toLocaleString()}</p>
-                        <a href="my-stationnements.html" class="btn btn-secondary" style="margin-top: 0.5rem;">
-                            Voir mes stationnements
-                        </a>
-                    </div>
-                `;
+                // Récupérer les détails du stationnement
+                const stationnementsResponse = await stationnementAPI.getUserStationnements(user.id);
+                const stationnements = stationnementsResponse.stationnements || [];
+                const currentStationnement = stationnements.find(s => !s.heure_sortie && s.parking_id === parkingId);
+
+                if (currentStationnement) {
+                    const entryDate = new Date(currentStationnement.heure_entree * 1000);
+                    const now = Date.now();
+                    const duration = Math.floor((now - entryDate.getTime()) / (1000 * 60));
+                    const hours = Math.floor(duration / 60);
+                    const minutes = duration % 60;
+                    const tarif = currentParking.tarif_horaire || 2.50;
+                    const estimatedCost = ((now - entryDate.getTime()) / (1000 * 60 * 60) * tarif).toFixed(2);
+
+                    document.getElementById('current-stationnement').innerHTML = `
+                        <div class="alert alert-success">
+                            <h3>${currentParking.nom || 'Parking'}</h3>
+                            <p><strong>Entrée:</strong> ${entryDate.toLocaleString('fr-FR')}</p>
+                            <p><strong>Durée:</strong> ${hours}h ${minutes}min</p>
+                            <p><strong>Coût estimé:</strong> ${estimatedCost}€</p>
+                            <a href="my-stationnements.html" class="btn btn-secondary" style="margin-top: 0.5rem;">
+                                Voir mes stationnements
+                            </a>
+                        </div>
+                    `;
+                } else {
+                    document.getElementById('current-stationnement').innerHTML = `
+                        <div class="alert alert-success">
+                            <p><strong>Stationnement en cours</strong></p>
+                            <p>Début: ${new Date().toLocaleString('fr-FR')}</p>
+                            <a href="my-stationnements.html" class="btn btn-secondary" style="margin-top: 0.5rem;">
+                                Voir mes stationnements
+                            </a>
+                        </div>
+                    `;
+                }
             } catch (error) {
                 showAlert(error.message || 'Erreur lors de l\'entrée', 'error');
             }
@@ -458,12 +537,15 @@
                 });
             });
 
+            // Calculer la date de fin en fonction de la durée
+            const endDate = new Date(startDate);
+            endDate.setDate(endDate.getDate() + duration);
+
             const subscriptionData = {
-                user_id: user.id,
-                subscription_type_id: currentSubscriptionTypeId,
                 parking_id: parkingId,
+                type: currentSubscriptionType,
                 start_date: Math.floor(startDate.getTime() / 1000),
-                duration_days: duration,
+                end_date: Math.floor(endDate.getTime() / 1000),
                 time_slots: timeSlots
             };
 

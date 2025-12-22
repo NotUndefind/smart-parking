@@ -155,9 +155,12 @@ const parkingAPI = {
         };
     },
 
-    async enter(parkingId) {
-        // Le backend attend un body JSON avec parking_id
-        return await apiCall(`/parkings/${parkingId}/enter`, 'POST', { parking_id: parkingId });
+    async enter(parkingId, reservationId = null, subscriptionId = null) {
+        // Le backend attend un body JSON avec parking_id et reservation_id ou subscription_id
+        const body = { parking_id: parkingId };
+        if (reservationId) body.reservation_id = reservationId;
+        if (subscriptionId) body.subscription_id = subscriptionId;
+        return await apiCall(`/parkings/${parkingId}/enter`, 'POST', body);
     }
 };
 
@@ -184,15 +187,16 @@ const subscriptionAPI = {
     },
 
     async getUserSubscriptions(userId) {
-        return await apiCall(`/users/${userId}/subscriptions`, 'GET');
+        const data = await apiCall(`/users/${userId}/subscriptions`, 'GET');
+        return {
+            subscriptions: data.subscriptions || data.data || []
+        };
     }
 };
 
 const stationnementAPI = {
-    async exitParking(stationnementId) {
-        // Le backend attend stationnement_id dans le body et l'URL doit matcher /parkings/{id}/exit
-        // L'ID dans l'URL n'est pas utilisé côté serveur, on peut donc réutiliser stationnementId.
-        return await apiCall(`/parkings/${stationnementId}/exit`, 'POST', {
+    async exitParking(stationnementId, parkingId) {
+        return await apiCall(`/parkings/${parkingId}/exit`, 'POST', {
             stationnement_id: stationnementId
         });
     },

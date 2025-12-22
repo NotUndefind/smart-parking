@@ -119,14 +119,9 @@
                                     </span>
                                 </td>
                                 <td>
-                                    ${res.statut === 'active' ? `
-                                        <button
-                                            class="btn btn-primary"
-                                            onclick="downloadInvoice('${res.id}')"
-                                        >
-                                            Facture
-                                        </button>
-                                    ` : ''}
+                                    <a href="parking-details.html?id=${res.parking_id}" class="btn btn-primary">
+                                        Voir le parking
+                                    </a>
                                 </td>
                             </tr>
                         `).join('')}
