@@ -21,6 +21,7 @@ use App\Application\DTOs\Input\GetMonthlyRevenueInput;
 use App\Application\UseCases\Owner\RegisterOwnerUseCase;
 use App\Application\UseCases\Owner\AuthenticateOwnerUseCase;
 use App\Application\UseCases\Owner\CreateParkingUseCase;
+use App\Application\UseCases\Owner\ListOwnerParkingsUseCase;
 use App\Application\UseCases\Owner\UpdateParkingTariffUseCase;
 use App\Application\UseCases\Owner\UpdateParkingScheduleUseCase;
 use App\Application\UseCases\Owner\AddSubscriptionTypeUseCase;
@@ -36,6 +37,7 @@ final class OwnerApiController
         private RegisterOwnerUseCase $registerOwnerUseCase,
         private AuthenticateOwnerUseCase $authenticateOwnerUseCase,
         private CreateParkingUseCase $createParkingUseCase,
+        private ListOwnerParkingsUseCase $listOwnerParkingsUseCase,
         private UpdateParkingTariffUseCase $updateParkingTariffUseCase,
         private UpdateParkingScheduleUseCase $updateParkingScheduleUseCase,
         private AddSubscriptionTypeUseCase $addSubscriptionTypeUseCase,
@@ -57,7 +59,8 @@ final class OwnerApiController
                     $input["email"],
                     $input["password"],
                     $input["first_name"],
-                    $input["last_name"]
+                    $input["last_name"],
+                    $input["company_name"]
                 )
             ) {
                 $this->jsonResponse(["error" => "Missing required fields"], 400);
@@ -67,9 +70,9 @@ final class OwnerApiController
             $registerInput = RegisterOwnerInput::create(
                 email: $input["email"],
                 password: $input["password"],
+                companyName: $input["company_name"],
                 firstName: $input["first_name"],
-                lastName: $input["last_name"],
-                companyName: $input["company_name"] ?? null
+                lastName: $input["last_name"]
             );
 
             $output = $this->registerOwnerUseCase->execute($registerInput);
@@ -114,7 +117,7 @@ final class OwnerApiController
             $this->jsonResponse([
                 "success" => true,
                 "token" => $output->token,
-                "role" => $output->role
+                "role" => "owner"
             ], 200);
 
         } catch (\Exception $e) {
@@ -163,6 +166,36 @@ final class OwnerApiController
             ], 201);
         } catch (\Exception $e) {
             $this->jsonResponse(["error" => $e->getMessage()], 400);
+        }
+    }
+
+    public function listOwnerParkings(string $ownerId): void
+    {
+        try {
+            $payload = $this->authMiddleware->handle();
+            $authenticatedOwnerId = $payload["sub"];
+
+            if (($payload["role"] ?? "") !== "owner") {
+                $this->jsonResponse(["error" => "Unauthorized"], 403);
+                return;
+            }
+
+            // Vérifier que l'owner demande ses propres parkings
+            if ($authenticatedOwnerId !== $ownerId) {
+                $this->jsonResponse(["error" => "Forbidden"], 403);
+                return;
+            }
+
+            $parkings = $this->listOwnerParkingsUseCase->execute($ownerId);
+
+            $this->jsonResponse([
+                "success" => true,
+                "parkings" => $parkings,
+                "count" => count($parkings)
+            ], 200);
+
+        } catch (\Exception $e) {
+            $this->jsonResponse(["error" => $e->getMessage()], 500);
         }
     }
 

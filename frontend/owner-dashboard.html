@@ -58,8 +58,19 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="tarif_horaire">Tarif horaire (€)</label>
-                    <input type="number" step="0.01" id="tarif_horaire" required min="0">
+                    <label>Tarifs par tranche horaire</label>
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem;">
+                        <button type="button" id="generate-auto-tariffs-btn" class="btn btn-secondary">Générer tarifs automatiques</button>
+                        <button type="button" id="add-tariff-btn" class="btn btn-secondary">+ Ajouter une tranche</button>
+                    </div>
+                    <div id="tariffs-container">
+                        <div class="tariff-row" style="display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;">
+                            <input type="number" class="tariff-duration" placeholder="Durée (min)" min="1" required style="flex: 1;">
+                            <input type="number" class="tariff-price" placeholder="Prix (€)" step="0.01" min="0" required style="flex: 1;">
+                            <button type="button" class="btn btn-secondary tariff-remove-btn" style="padding: 0.25rem 0.5rem;">✕</button>
+                        </div>
+                    </div>
+                    <p style="font-size: 0.85rem; color: #666; margin-top: 0.5rem;">Astuce: Utilisez le bouton "Générer tarifs automatiques" pour créer une grille tarifaire par défaut (tranches de 15 min)</p>
                 </div>
 
                 <div class="form-group">
@@ -206,6 +217,31 @@
 
         function showCreateParkingForm() {
             document.getElementById('create-parking-form').style.display = 'block';
+
+            // Attacher les event listeners maintenant que le formulaire est visible
+            const generateBtn = document.getElementById('generate-auto-tariffs-btn');
+            const addBtn = document.getElementById('add-tariff-btn');
+            const tariffsContainer = document.getElementById('tariffs-container');
+
+            if (generateBtn && !generateBtn.dataset.listenerAttached) {
+                generateBtn.addEventListener('click', generateAutoTariffs);
+                generateBtn.dataset.listenerAttached = 'true';
+            }
+
+            if (addBtn && !addBtn.dataset.listenerAttached) {
+                addBtn.addEventListener('click', addTariff);
+                addBtn.dataset.listenerAttached = 'true';
+            }
+
+            // Event delegation pour les boutons de suppression dynamiques
+            if (tariffsContainer && !tariffsContainer.dataset.listenerAttached) {
+                tariffsContainer.addEventListener('click', function(e) {
+                    if (e.target.classList.contains('tariff-remove-btn')) {
+                        removeTariff(e.target);
+                    }
+                });
+                tariffsContainer.dataset.listenerAttached = 'true';
+            }
         }
 
         function hideCreateParkingForm() {
@@ -216,17 +252,6 @@
         let currentParkingId = null;
 
         async function loadParkings() {
-            // Note: La route GET /owners/{id}/parkings n'existe pas encore côté backend
-            // Affichage d'un message temporaire
-            document.getElementById('parkings-list').innerHTML = `
-                <div style="padding: 1rem; background: #fff3cd; border-radius: 4px; border-left: 4px solid #ffc107;">
-                    <p style="margin: 0; color: #856404;"><strong>Information:</strong> La liste des parkings s'affichera ici une fois la route backend <code>GET /api/owners/{id}/parkings</code> implémentée.</p>
-                    <p style="margin: 0.5rem 0 0 0; color: #856404;">En attendant, vous pouvez créer un parking et le consulter directement via son ID.</p>
-                </div>
-            `;
-
-            // Code à activer une fois la route disponible:
-            /*
             try {
                 const response = await fetch(`${API_BASE_URL}/owners/${owner.id}/parkings`, {
                     headers: {
@@ -239,7 +264,6 @@
             } catch (error) {
                 document.getElementById('parkings-list').innerHTML = '<p>Aucun parking créé pour le moment</p>';
             }
-            */
         }
 
         function displayParkings(parkings) {
@@ -249,11 +273,11 @@
             }
 
             const html = parkings.map(parking => `
-                <div class="parking-card" style="margin-top: 1rem;">
-                    <h3>${parking.nom || 'Parking'}</h3>
-                    <p>${parking.adresse || ''}</p>
-                    <p><strong>Places:</strong> ${parking.nb_places}</p>
-                    <p><strong>Tarif:</strong> ${parking.tarif_horaire}€/h</p>
+                <div class="parking-card" style="margin-top: 1rem; padding: 1rem; background: #f8f9fa; border-radius: 4px;">
+                    <h3>${parking.name || 'Parking'}</h3>
+                    <p>${parking.address || ''}</p>
+                    <p><strong>Places totales:</strong> ${parking.total_spots}</p>
+                    <p><strong>Places disponibles:</strong> ${parking.available_spots}</p>
                     <button class="btn btn-primary" onclick="viewParkingDetails('${parking.id}')">
                         Voir les détails
                     </button>
@@ -527,12 +551,94 @@
             return `${hours}h ${minutes}min`;
         }
 
+        window.generateAutoTariffs = function() {
+            console.log('Génération des tarifs automatiques...');
+            const container = document.getElementById('tariffs-container');
+
+            if (!container) {
+                console.error('Container not found!');
+                return;
+            }
+
+            // Vider le container
+            container.innerHTML = '';
+
+            // Générer des tranches par paliers de 15 minutes jusqu'à 4 heures
+            // Avec un tarif progressif: 0.40€ pour les premières 15min, puis augmentation progressive
+            const tariffs = [
+                { duration: 15, price: 0.40 },
+                { duration: 30, price: 0.80 },
+                { duration: 45, price: 1.20 },
+                { duration: 60, price: 1.60 },
+                { duration: 75, price: 2.00 },
+                { duration: 90, price: 2.50 },
+                { duration: 105, price: 3.00 },
+                { duration: 120, price: 3.50 },
+                { duration: 135, price: 4.00 },
+                { duration: 150, price: 4.50 },
+                { duration: 165, price: 5.00 },
+                { duration: 180, price: 5.50 },
+                { duration: 195, price: 6.00 },
+                { duration: 210, price: 6.50 },
+                { duration: 225, price: 7.00 },
+                { duration: 240, price: 7.50 }
+            ];
+
+            tariffs.forEach(tariff => {
+                const newRow = document.createElement('div');
+                newRow.className = 'tariff-row';
+                newRow.style.cssText = 'display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;';
+                newRow.innerHTML = `
+                    <input type="number" class="tariff-duration" value="${tariff.duration}" min="1" required style="flex: 1;">
+                    <input type="number" class="tariff-price" value="${tariff.price.toFixed(2)}" step="0.01" min="0" required style="flex: 1;">
+                    <button type="button" class="btn btn-secondary tariff-remove-btn" style="padding: 0.25rem 0.5rem;">✕</button>
+                `;
+                container.appendChild(newRow);
+            });
+
+            console.log(`${tariffs.length} tranches tarifaires générées`);
+
+            if (typeof showAlert === 'function') {
+                showAlert('Tarifs automatiques générés ! Vous pouvez les modifier.', 'success');
+            }
+        };
+
+        window.addTariff = function() {
+            const container = document.getElementById('tariffs-container');
+            const newRow = document.createElement('div');
+            newRow.className = 'tariff-row';
+            newRow.style.cssText = 'display: flex; gap: 0.5rem; margin-bottom: 0.5rem; align-items: center;';
+            newRow.innerHTML = `
+                <input type="number" class="tariff-duration" placeholder="Durée (min)" min="1" required style="flex: 1;">
+                <input type="number" class="tariff-price" placeholder="Prix (€)" step="0.01" min="0" required style="flex: 1;">
+                <button type="button" class="btn btn-secondary tariff-remove-btn" style="padding: 0.25rem 0.5rem;">✕</button>
+            `;
+            container.appendChild(newRow);
+        };
+
+        window.removeTariff = function(button) {
+            const container = document.getElementById('tariffs-container');
+            if (container.children.length > 1) {
+                button.parentElement.remove();
+            } else {
+                showAlert('Vous devez avoir au moins une tranche tarifaire', 'error');
+            }
+        };
+
         const parkingForm = document.getElementById('parking-form');
         parkingForm.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const tarifHoraire = parseFloat(document.getElementById('tarif_horaire').value);
             const horairesTexte = document.getElementById('horaires').value;
+
+            // Récupérer tous les tarifs
+            const tariffRows = document.querySelectorAll('.tariff-row');
+            const tariffs = Array.from(tariffRows).map(row => {
+                return {
+                    duration: parseInt(row.querySelector('.tariff-duration').value),
+                    price: parseFloat(row.querySelector('.tariff-price').value)
+                };
+            });
 
             const parkingData = {
                 name: document.getElementById('nom').value,
@@ -540,12 +646,7 @@
                 latitude: parseFloat(document.getElementById('latitude').value),
                 longitude: parseFloat(document.getElementById('longitude').value),
                 total_spots: parseInt(document.getElementById('nb_places').value),
-                tariffs: [
-                    {
-                        duration: 60,
-                        price: tarifHoraire
-                    }
-                ],
+                tariffs: tariffs,
                 schedule: [
                     {
                         day: 'all',

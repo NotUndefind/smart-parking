@@ -1,5 +1,20 @@
 const API_BASE_URL = 'http://localhost:8000/api';
 
+// Fonction pour décoder le JWT (sans vérification de signature, juste pour lire les données)
+function decodeJWT(token) {
+    try {
+        const base64Url = token.split('.')[1];
+        const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+        const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+            return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+        }).join(''));
+        return JSON.parse(jsonPayload);
+    } catch (error) {
+        console.error('Erreur décodage JWT:', error);
+        return null;
+    }
+}
+
 async function apiCall(endpoint, method = 'GET', body = null) {
     const token = localStorage.getItem('token');
     const headers = {
@@ -39,7 +54,17 @@ const authAPI = {
         const data = await apiCall('/auth/login', 'POST', { email, password });
         if (data.token) {
             localStorage.setItem('token', data.token);
-            localStorage.setItem('user', JSON.stringify(data.user));
+            // Décoder le JWT pour récupérer les infos de l'utilisateur
+            const payload = decodeJWT(data.token);
+            if (payload) {
+                const userInfo = {
+                    id: payload.sub,
+                    email: payload.email,
+                    first_name: payload.first_name,
+                    last_name: payload.last_name
+                };
+                localStorage.setItem('user', JSON.stringify(userInfo));
+            }
         }
         return data;
     },
@@ -52,7 +77,18 @@ const authAPI = {
         const data = await apiCall('/owner/login', 'POST', { email, password });
         if (data.token) {
             localStorage.setItem('token', data.token);
-            localStorage.setItem('owner', JSON.stringify(data.user));
+            // Décoder le JWT pour récupérer les infos de l'owner
+            const payload = decodeJWT(data.token);
+            if (payload) {
+                const ownerInfo = {
+                    id: payload.sub,
+                    email: payload.email,
+                    first_name: payload.first_name,
+                    last_name: payload.last_name,
+                    company_name: payload.company_name
+                };
+                localStorage.setItem('owner', JSON.stringify(ownerInfo));
+            }
         }
         return data;
     },
@@ -112,6 +148,10 @@ const reservationAPI = {
 
     async getUserReservations(userId) {
         return await apiCall('/user/reservations', 'GET');
+    },
+
+    async getInvoice(reservationId) {
+        return await apiCall(`/reservations/${reservationId}/invoice`, 'GET');
     }
 };
 
