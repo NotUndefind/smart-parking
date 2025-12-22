@@ -1,0 +1,12 @@
+{
+    "id": "subscription_69493b12a35415.06539158",
+    "parking_id": "parking_demo_user",
+    "user_id": "user_6947467654d366.12864102",
+    "type": "daily",
+    "price": 0,
+    "start_date": 1766406930,
+    "end_date": 1766493330,
+    "is_active": true,
+    "created_at": "2025-12-22 12:35:30",
+    "updated_at": null
+}

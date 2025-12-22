@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\UseCases\Owner;
 
+use App\Application\DTOs\Output\AvailableSpotsOutput;
 use App\Domain\Exceptions\ParkingNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 use App\Domain\Repositories\ReservationRepositoryInterface;
@@ -18,7 +19,7 @@ final class GetAvailableSpotsAtTimeUseCase
     ) {
     }
 
-    public function execute(string $parkingId, int $timestamp): int
+    public function execute(string $parkingId, int $timestamp): AvailableSpotsOutput
     {
         // 1. Vérifier que le parking existe
         $parking = $this->parkingRepository->findById($parkingId);
@@ -41,7 +42,14 @@ final class GetAvailableSpotsAtTimeUseCase
 
         // 4. Calculer les places disponibles
         $occupiedSpots = count($activeReservations) + $activeSubscriptionsCount;
-        return max(0, $parking->getTotalSpots() - $occupiedSpots);
+        $totalSpots = $parking->getTotalSpots();
+        $availableSpots = max(0, $totalSpots - $occupiedSpots);
+
+        return new AvailableSpotsOutput(
+            availableSpots: $availableSpots,
+            totalSpots: $totalSpots,
+            occupiedSpots: $occupiedSpots
+        );
     }
 }
 

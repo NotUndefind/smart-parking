@@ -23,12 +23,12 @@ final class StationnementOutput
         return [
             'id' => $this->id,
             'parking_id' => $this->parkingId,
-            'parking_name' => $this->parkingName,
-            'entry_time' => $this->entryTime,
-            'exit_time' => $this->exitTime,
-            'final_price' => $this->finalPrice,
-            'penalty_amount' => $this->penaltyAmount,
-            'status' => $this->status,
+            'parking_nom' => $this->parkingName,
+            'heure_entree' => $this->entryTime,
+            'heure_sortie' => $this->exitTime,
+            'prix_total' => $this->finalPrice,
+            'penalite' => $this->penaltyAmount,
+            'statut' => $this->status,
         ];
     }
 }

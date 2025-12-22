@@ -186,14 +186,17 @@ final class UserApiController
             $payload = $this->authMiddleware->handle();
             $userId = $payload["sub"];
 
-            $output = $this->listUserReservationsUseCase->execute($userId);
+            $reservations = $this->listUserReservationsUseCase->execute($userId);
+
+            // Convertir les objets ReservationOutput en tableaux
+            $reservationsArray = array_map(fn($res) => $res->toArray(), $reservations);
 
             // Le frontend attend une clé "reservations"
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "reservations" => $output->reservations,
-                    "count" => count($output->reservations),
+                    "reservations" => $reservationsArray,
+                    "count" => count($reservationsArray),
                 ],
                 200,
             );
@@ -205,14 +208,14 @@ final class UserApiController
     public function getParkingSubscriptions(string $parkingId): void
     {
         try {
-            $output = $this->listAvailableSubscriptionsUseCase->execute(
+            $subscriptions = $this->listAvailableSubscriptionsUseCase->execute(
                 $parkingId,
             );
 
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "subscriptions" => $output->subscriptions,
+                    "subscriptions" => $subscriptions,
                 ],
                 200,
             );
@@ -285,16 +288,7 @@ final class UserApiController
                 [
                     "success" => true,
                     "subscriptions" => array_map(
-                        fn($sub) => [
-                            'id' => $sub->id,
-                            'parking_id' => $sub->parkingId,
-                            'parking_name' => $sub->parkingName,
-                            'type' => $sub->type,
-                            'price' => $sub->price,
-                            'start_date' => $sub->startDate,
-                            'end_date' => $sub->endDate,
-                            'is_active' => $sub->isActive,
-                        ],
+                        fn($sub) => $sub->toArray(),
                         $subscriptions,
                     ),
                     "count" => count($subscriptions),
@@ -331,7 +325,7 @@ final class UserApiController
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "stationnement_id" => $output->stationnementId,
+                    "stationnement_id" => $output->id,
                     "message" => "Entrée en parking enregistrée avec succès",
                 ],
                 201,
@@ -366,8 +360,8 @@ final class UserApiController
                 [
                     "success" => true,
                     "final_price" => $output->finalPrice,
-                    "penalty" => $output->penalty,
-                    "total" => $output->total,
+                    "penalty_amount" => $output->penaltyAmount,
+                    "total" => $output->finalPrice + $output->penaltyAmount,
                     "message" => "Sortie de parking enregistrée avec succès",
                 ],
                 200,
@@ -383,14 +377,17 @@ final class UserApiController
             $payload = $this->authMiddleware->handle();
             $userId = $payload["sub"];
 
-            $output = $this->listUserStationnementsUseCase->execute($userId);
+            $stationnements = $this->listUserStationnementsUseCase->execute($userId);
 
             // Le frontend attend une clé "stationnements"
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "stationnements" => $output->stationnements,
-                    "count" => count($output->stationnements),
+                    "stationnements" => array_map(
+                        fn($s) => $s->toArray(),
+                        $stationnements,
+                    ),
+                    "count" => count($stationnements),
                 ],
                 200,
             );
