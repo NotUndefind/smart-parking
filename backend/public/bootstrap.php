@@ -12,6 +12,7 @@ use App\Application\UseCases\Auth\RegisterUserUseCase;
 use App\Application\UseCases\Owner\AuthenticateOwnerUseCase;
 use App\Application\UseCases\Owner\RegisterOwnerUseCase;
 use App\Application\UseCases\Owner\CreateParkingUseCase;
+use App\Application\UseCases\Owner\ListOwnerParkingsUseCase;
 use App\Application\UseCases\Owner\UpdateParkingTariffUseCase;
 use App\Application\UseCases\Owner\UpdateParkingScheduleUseCase;
 use App\Application\UseCases\Owner\AddSubscriptionTypeUseCase;
@@ -27,6 +28,7 @@ use App\Application\UseCases\User\GetParkingDetailsUseCase;
 use App\Application\UseCases\User\CreateReservationUseCase;
 use App\Application\UseCases\User\ListUserReservationsUseCase;
 use App\Application\UseCases\User\ListAvailableSubscriptionsUseCase;
+use App\Application\UseCases\User\ListUserSubscriptionsUseCase;
 use App\Application\UseCases\User\SubscribeToPlanUseCase;
 use App\Application\UseCases\User\EnterParkingUseCase;
 use App\Application\UseCases\User\ExitParkingUseCase;
@@ -157,6 +159,11 @@ $listAvailableSubscriptionsUseCase = new ListAvailableSubscriptionsUseCase(
     parkingRepository: $parkingRepository
 );
 
+$listUserSubscriptionsUseCase = new ListUserSubscriptionsUseCase(
+    subscriptionRepository: $subscriptionRepository,
+    parkingRepository: $parkingRepository
+);
+
 $subscribeToPlanUseCase = new SubscribeToPlanUseCase(
     userRepository: $userRepository,
     parkingRepository: $parkingRepository,
@@ -207,6 +214,11 @@ $authenticateOwnerUseCase = new AuthenticateOwnerUseCase(
 $createParkingUseCase = new CreateParkingUseCase(
     ownerRepository: $ownerRepository,
     parkingRepository: $parkingRepository
+);
+
+$listOwnerParkingsUseCase = new ListOwnerParkingsUseCase(
+    parkingRepository: $parkingRepository,
+    ownerRepository: $ownerRepository
 );
 
 $updateParkingTariffUseCase = new UpdateParkingTariffUseCase(
@@ -264,6 +276,7 @@ $userController = new UserApiController(
     createReservationUseCase: $createReservationUseCase,
     listUserReservationsUseCase: $listUserReservationsUseCase,
     listAvailableSubscriptionsUseCase: $listAvailableSubscriptionsUseCase,
+    listUserSubscriptionsUseCase: $listUserSubscriptionsUseCase,
     subscribeToPlanUseCase: $subscribeToPlanUseCase,
     enterParkingUseCase: $enterParkingUseCase,
     exitParkingUseCase: $exitParkingUseCase,
@@ -276,6 +289,7 @@ $ownerController = new OwnerApiController(
     registerOwnerUseCase: $registerOwnerUseCase,
     authenticateOwnerUseCase: $authenticateOwnerUseCase,
     createParkingUseCase: $createParkingUseCase,
+    listOwnerParkingsUseCase: $listOwnerParkingsUseCase,
     updateParkingTariffUseCase: $updateParkingTariffUseCase,
     updateParkingScheduleUseCase: $updateParkingScheduleUseCase,
     addSubscriptionTypeUseCase: $addSubscriptionTypeUseCase,

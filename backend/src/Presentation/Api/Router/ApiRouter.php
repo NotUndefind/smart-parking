@@ -61,6 +61,11 @@ final class ApiRouter
             return;
         }
 
+        if ($method === 'GET' && preg_match('#^/owners/([^/]+)/parkings$#', $path, $matches)) {
+            $this->ownerController->listOwnerParkings($matches[1]);
+            return;
+        }
+
         if ($method === 'PUT' && preg_match('#^/parkings/([^/]+)/tariff$#', $path, $matches)) {
             $this->ownerController->updateParkingTariff($matches[1]);
             return;
@@ -140,6 +145,11 @@ final class ApiRouter
         if ($method === 'POST' && $path === '/subscriptions') {
             // TODO: Vérifier AuthMiddleware
             $this->userController->subscribe();
+            return;
+        }
+
+        if ($method === 'GET' && preg_match('#^/users/([^/]+)/subscriptions$#', $path, $matches)) {
+            $this->userController->listUserSubscriptions($matches[1]);
             return;
         }
 

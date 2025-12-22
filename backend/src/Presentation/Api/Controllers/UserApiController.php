@@ -10,6 +10,7 @@ use App\Application\UseCases\User\GetParkingDetailsUseCase;
 use App\Application\UseCases\User\CreateReservationUseCase;
 use App\Application\UseCases\User\ListUserReservationsUseCase;
 use App\Application\UseCases\User\ListAvailableSubscriptionsUseCase;
+use App\Application\UseCases\User\ListUserSubscriptionsUseCase;
 use App\Application\UseCases\User\SubscribeToPlanUseCase;
 use App\Application\UseCases\User\EnterParkingUseCase;
 use App\Application\UseCases\User\ExitParkingUseCase;
@@ -36,6 +37,7 @@ final class UserApiController
         private CreateReservationUseCase $createReservationUseCase,
         private ListUserReservationsUseCase $listUserReservationsUseCase,
         private ListAvailableSubscriptionsUseCase $listAvailableSubscriptionsUseCase,
+        private ListUserSubscriptionsUseCase $listUserSubscriptionsUseCase,
         private SubscribeToPlanUseCase $subscribeToPlanUseCase,
         private EnterParkingUseCase $enterParkingUseCase,
         private ExitParkingUseCase $exitParkingUseCase,
@@ -223,6 +225,40 @@ final class UserApiController
             );
         } catch (\Exception $e) {
             $this->jsonResponse(["error" => $e->getMessage()], 400);
+        }
+    }
+
+    public function listUserSubscriptions(string $userId): void
+    {
+        try {
+            $payload = $this->authMiddleware->handle();
+            $authenticatedUserId = $payload["sub"];
+
+            // Vérifier que l'utilisateur demande ses propres abonnements
+            if ($authenticatedUserId !== $userId) {
+                $this->jsonResponse(["error" => "Forbidden"], 403);
+                return;
+            }
+
+            $subscriptions = $this->listUserSubscriptionsUseCase->execute($userId);
+
+            $this->jsonResponse([
+                "success" => true,
+                "subscriptions" => array_map(fn($sub) => [
+                    'id' => $sub->id,
+                    'parking_id' => $sub->parkingId,
+                    'parking_name' => $sub->parkingName,
+                    'type' => $sub->type,
+                    'price' => $sub->price,
+                    'start_date' => $sub->startDate,
+                    'end_date' => $sub->endDate,
+                    'is_active' => $sub->isActive
+                ], $subscriptions),
+                "count" => count($subscriptions)
+            ], 200);
+
+        } catch (\Exception $e) {
+            $this->jsonResponse(["error" => $e->getMessage()], 500);
         }
     }
 
