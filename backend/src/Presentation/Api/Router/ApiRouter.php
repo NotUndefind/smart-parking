@@ -155,14 +155,15 @@ final class ApiRouter
 
         // Routes User - Stationnements
         if ($method === 'POST' && preg_match('#^/parkings/([^/]+)/enter$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware
-            $this->userController->enterParking($matches[1]);
+            // L'identifiant du parking est déjà porté par l'URL côté frontend.
+            // Le contrôleur récupère le parking depuis le corps de la requête.
+            $this->userController->enterParking();
             return;
         }
 
         if ($method === 'POST' && preg_match('#^/parkings/([^/]+)/exit$#', $path, $matches)) {
-            // TODO: Vérifier AuthMiddleware
-            $this->userController->exitParking($matches[1]);
+            // Le contrôleur utilise le stationnement_id envoyé dans le body JSON
+            $this->userController->exitParking();
             return;
         }
 

@@ -42,7 +42,6 @@
 
     <script src="js/api.js"></script>
     <script>
-        // Vérifier l'authentification
         if (!authAPI.isAuthenticated()) {
             window.location.href = 'login.html';
         }
@@ -51,8 +50,6 @@
         const reservationsContainer = document.getElementById('reservations-container');
         const stationnementsContainer = document.getElementById('stationnements-container');
         const loadingDiv = document.getElementById('loading');
-
-        // Logout
         document.getElementById('logout-btn').addEventListener('click', (e) => {
             e.preventDefault();
             authAPI.logout();
@@ -166,7 +163,7 @@
                                     ${!stat.heure_sortie ? `
                                         <button
                                             class="btn btn-danger"
-                                            onclick="exitParking('${stat.parking_id}')"
+                                            onclick="exitParking('${stat.id || stat.stationnement_id}')"
                                         >
                                             Sortir
                                         </button>
@@ -209,21 +206,36 @@
 
         async function downloadInvoice(reservationId) {
             try {
-                const response = await reservationAPI.getInvoice(reservationId);
-                showAlert('Facture téléchargée avec succès', 'success');
-                // Ici tu pourrais implémenter le téléchargement du PDF
+                const data = await reservationAPI.getInvoice(reservationId);
+
+                if (data.invoice) {
+                    const invoice = data.invoice;
+                    const invoiceDetails = `
+                        Facture N° ${invoice.numero || invoice.id}
+                        Date: ${formatDate(invoice.date_emission)}
+                        Montant HT: ${invoice.montant_ht}€
+                        TVA: ${invoice.montant_tva}€
+                        Montant TTC: ${invoice.montant_total}€
+                        Statut: ${invoice.statut}
+                    `;
+
+                    alert(invoiceDetails);
+                    showAlert('Facture récupérée avec succès', 'success');
+                } else {
+                    showAlert('Facture non disponible pour cette réservation', 'warning');
+                }
             } catch (error) {
-                showAlert('Erreur lors du téléchargement de la facture', 'error');
+                showAlert('Erreur lors de la récupération de la facture', 'error');
             }
         }
 
-        async function exitParking(parkingId) {
+        async function exitParking(stationnementId) {
             if (!confirm('Voulez-vous vraiment sortir du parking ?')) {
                 return;
             }
 
             try {
-                await stationnementAPI.exitParking(parkingId);
+                await stationnementAPI.exitParking(stationnementId);
                 showAlert('Sortie enregistrée avec succès', 'success');
                 loadStationnements();
                 loadReservations();
@@ -232,7 +244,6 @@
             }
         }
 
-        // Charger les données au chargement
         window.addEventListener('load', () => {
             loadReservations();
             loadStationnements();

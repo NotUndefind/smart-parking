@@ -68,13 +68,22 @@ final class UserApiController
                 radiusKm: $radius,
             );
 
-            $output = $this->searchParkingByLocationUseCase->execute($input);
+            $parkings = $this->searchParkingByLocationUseCase->execute($input);
 
+            // Convertir les ParkingOutput en array pour le JSON
+            $parkingsArray = array_map(function ($parkingOutput) {
+                $data = $parkingOutput->toArray();
+                // Ajouter available_spots pour le frontend (pour l'instant = total_spots)
+                $data['available_spots'] = $data['total_spots'];
+                return $data;
+            }, $parkings);
+
+            // Le frontend attend une clé "parkings"
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "data" => $output->parkings,
-                    "count" => count($output->parkings),
+                    "parkings" => $parkingsArray,
+                    "count" => count($parkingsArray),
                 ],
                 200,
             );
@@ -92,17 +101,46 @@ final class UserApiController
 
         try {
             $input = GetParkingDetailsInput::create(parkingId: $parkingId);
+            
+            $output = $this->getParkingDetailsUseCase->execute(
+                $input->parkingId,
+                $input->timestamp
+            );
 
-            $output = $this->getParkingDetailsUseCase->execute($input);
+            // Convertir en array et adapter pour le frontend
+            $parkingData = $output->toArray();
+            // Ajouter les champs attendus par le frontend
+            $parkingData['nom'] = $parkingData['name'];
+            $parkingData['adresse'] = $parkingData['address'];
+            $parkingData['nb_places'] = $parkingData['total_spots'];
+            $parkingData['places_disponibles'] = $parkingData['available_spots'];
+            // Calculer un tarif horaire moyen pour l'affichage
+            $tariffs = $parkingData['tariffs'] ?? [];
+            if (!empty($tariffs) && isset($tariffs[0]['price'])) {
+                $parkingData['tarif_horaire'] = ($tariffs[0]['price'] / ($tariffs[0]['duration'] / 60)) ?? 2.0;
+            } else {
+                $parkingData['tarif_horaire'] = 2.0;
+            }
+            // Formater les horaires pour l'affichage
+            $schedule = $parkingData['schedule'] ?? [];
+            if (!empty($schedule) && isset($schedule[0]['hours'])) {
+                $parkingData['horaires'] = $schedule[0]['hours'];
+            } else {
+                $parkingData['horaires'] = '24h/24';
+            }
 
+            // Le frontend attend une clé "parking"
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "data" => $output->parkingDetails,
+                    "parking" => $parkingData,
                 ],
                 200,
             );
+        } catch (\App\Domain\Exceptions\ParkingNotFoundException $e) {
+            $this->jsonResponse(["error" => $e->getMessage()], 404);
         } catch (\Exception $e) {
+            error_log("Erreur getParkingDetails: " . $e->getMessage() . "\n" . $e->getTraceAsString());
             $this->jsonResponse(["error" => $e->getMessage()], 500);
         }
     }
@@ -150,10 +188,11 @@ final class UserApiController
 
             $output = $this->listUserReservationsUseCase->execute($userId);
 
+            // Le frontend attend une clé "reservations"
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "data" => $output->reservations,
+                    "reservations" => $output->reservations,
                     "count" => count($output->reservations),
                 ],
                 200,
@@ -242,21 +281,26 @@ final class UserApiController
 
             $subscriptions = $this->listUserSubscriptionsUseCase->execute($userId);
 
-            $this->jsonResponse([
-                "success" => true,
-                "subscriptions" => array_map(fn($sub) => [
-                    'id' => $sub->id,
-                    'parking_id' => $sub->parkingId,
-                    'parking_name' => $sub->parkingName,
-                    'type' => $sub->type,
-                    'price' => $sub->price,
-                    'start_date' => $sub->startDate,
-                    'end_date' => $sub->endDate,
-                    'is_active' => $sub->isActive
-                ], $subscriptions),
-                "count" => count($subscriptions)
-            ], 200);
-
+            $this->jsonResponse(
+                [
+                    "success" => true,
+                    "subscriptions" => array_map(
+                        fn($sub) => [
+                            'id' => $sub->id,
+                            'parking_id' => $sub->parkingId,
+                            'parking_name' => $sub->parkingName,
+                            'type' => $sub->type,
+                            'price' => $sub->price,
+                            'start_date' => $sub->startDate,
+                            'end_date' => $sub->endDate,
+                            'is_active' => $sub->isActive,
+                        ],
+                        $subscriptions,
+                    ),
+                    "count" => count($subscriptions),
+                ],
+                200,
+            );
         } catch (\Exception $e) {
             $this->jsonResponse(["error" => $e->getMessage()], 500);
         }
@@ -341,10 +385,11 @@ final class UserApiController
 
             $output = $this->listUserStationnementsUseCase->execute($userId);
 
+            // Le frontend attend une clé "stationnements"
             $this->jsonResponse(
                 [
                     "success" => true,
-                    "data" => $output->stationnements,
+                    "stationnements" => $output->stationnements,
                     "count" => count($output->stationnements),
                 ],
                 200,

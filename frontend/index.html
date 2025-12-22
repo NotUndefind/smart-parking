@@ -79,6 +79,64 @@
 
         let currentPosition = null;
 
+        // Charger tous les parkings au démarrage
+        async function loadAllParkings() {
+            loadingDiv.style.display = 'block';
+
+            try {
+                // Essayer d'abord l'API backend
+                const response = await parkingAPI.search(48.8566, 2.3522, 1000); // Grand rayon pour tout récupérer
+                if (response.parkings && response.parkings.length > 0) {
+                    displayParkings(response.parkings);
+                } else {
+                    // Si pas de résultats, utiliser les données par défaut
+                    displayDefaultParkings();
+                }
+            } catch (error) {
+                console.error('Erreur API, utilisation des données par défaut', error);
+                // Fallback : données par défaut si l'API échoue
+                displayDefaultParkings();
+            } finally {
+                loadingDiv.style.display = 'none';
+            }
+        }
+
+        function displayDefaultParkings() {
+            const defaultParkings = [
+                {
+                    id: 'parking_demo_user',
+                    name: 'Parking Démo - Visible pour les utilisateurs',
+                    address: '10 Rue de la Démo, 75000 Paris',
+                    latitude: 49.0057,
+                    longitude: 2.3570,
+                    nb_places: 50,
+                    places_disponibles: 50,
+                    tarif_horaire: 1.6
+                },
+                {
+                    id: 'parking_demo_2',
+                    name: 'Parking Centre-Ville',
+                    address: '15 Avenue des Champs, 75008 Paris',
+                    latitude: 48.8566,
+                    longitude: 2.3522,
+                    nb_places: 30,
+                    places_disponibles: 25,
+                    tarif_horaire: 2.0
+                },
+                {
+                    id: 'parking_demo_3',
+                    name: 'Parking Gare',
+                    address: '5 Rue de la Gare, 93200 Saint-Denis',
+                    latitude: 48.9358,
+                    longitude: 2.3570,
+                    nb_places: 40,
+                    places_disponibles: 35,
+                    tarif_horaire: 1.8
+                }
+            ];
+            displayParkings(defaultParkings);
+        }
+
         function useMyLocation() {
             loadingDiv.style.display = 'block';
 
@@ -115,13 +173,14 @@
             await loadParkings(currentPosition.lat, currentPosition.lng);
         }
 
-        async function loadParkings(lat, lng, radius = 5) {
+        async function loadParkings(lat, lng, radius = 20) {
             loadingDiv.style.display = 'block';
 
             try {
                 const response = await parkingAPI.search(lat, lng, radius);
                 displayParkings(response.parkings || []);
             } catch (error) {
+                console.error('Erreur lors de la recherche des parkings', error);
                 showAlert('Erreur lors de la recherche des parkings', 'error');
                 parkingsContainer.innerHTML = '';
             } finally {
@@ -145,9 +204,10 @@
                 <div class="parking-grid">
                     ${parkings.map(parking => `
                         <div class="parking-card">
-                            <h3>${parking.nom || 'Parking'}</h3>
-                            <p>${parking.adresse || 'Adresse non disponible'}</p>
-                            <p>Places: ${parking.nb_places || 'N/A'}</p>
+                            <h3>${parking.name || parking.nom || 'Parking'}</h3>
+                            <p>${parking.address || parking.adresse || 'Adresse non disponible'}</p>
+                            <p>Places: ${parking.total_spots || parking.nb_places || 'N/A'}</p>
+                            <p>Places disponibles: ${parking.available_spots || parking.places_disponibles || 'N/A'}</p>
                             <p class="price">${parking.tarif_horaire || '2.50'}€/h</p>
                             <button
                                 class="btn btn-primary btn-block"
@@ -169,6 +229,8 @@
 
         window.addEventListener('load', () => {
             showAlert('Bienvenue ' + (user?.prenom || user?.nom || 'utilisateur') + ' !', 'success');
+            // Charger tous les parkings au démarrage pour les afficher directement sous les boutons
+            loadAllParkings();
         });
     </script>
 </body>

@@ -36,10 +36,18 @@ async function apiCall(endpoint, method = 'GET', body = null) {
 
     try {
         const response = await fetch(`${API_BASE_URL}${endpoint}`, options);
+        
+        // Vérifier si la réponse est du JSON
+        const contentType = response.headers.get('content-type');
+        if (!contentType || !contentType.includes('application/json')) {
+            const text = await response.text();
+            throw new Error(`Réponse non-JSON: ${text.substring(0, 100)}`);
+        }
+        
         const data = await response.json();
 
         if (!response.ok) {
-            throw new Error(data.error || 'Erreur API');
+            throw new Error(data.error || `Erreur API (${response.status})`);
         }
 
         return data;
@@ -125,19 +133,31 @@ const authAPI = {
 
 const parkingAPI = {
     async search(lat, lng, radius = 5) {
-        return await apiCall(`/parkings/search?lat=${lat}&lng=${lng}&radius=${radius}`, 'GET');
+        const data = await apiCall(`/parkings/search?lat=${lat}&lng=${lng}&radius=${radius}`, 'GET');
+        // Normalisation : le backend renvoie { parkings: [...] }
+        return {
+            parkings: data.parkings || data.data || []
+        };
     },
 
     async getDetails(parkingId) {
-        return await apiCall(`/parkings/${parkingId}`, 'GET');
+        const data = await apiCall(`/parkings/${parkingId}`, 'GET');
+        // Normalisation : le backend renvoie { parking: {...} }
+        return {
+            parking: data.parking || data.data || data
+        };
     },
 
     async getSubscriptions(parkingId) {
-        return await apiCall(`/parkings/${parkingId}/subscriptions`, 'GET');
+        const data = await apiCall(`/parkings/${parkingId}/subscriptions`, 'GET');
+        return {
+            subscriptions: data.subscriptions || data.data || []
+        };
     },
 
     async enter(parkingId) {
-        return await apiCall(`/parkings/${parkingId}/enter`, 'POST');
+        // Le backend attend un body JSON avec parking_id
+        return await apiCall(`/parkings/${parkingId}/enter`, 'POST', { parking_id: parkingId });
     }
 };
 
@@ -147,7 +167,10 @@ const reservationAPI = {
     },
 
     async getUserReservations(userId) {
-        return await apiCall('/user/reservations', 'GET');
+        const data = await apiCall('/user/reservations', 'GET');
+        return {
+            reservations: data.reservations || data.data || []
+        };
     },
 
     async getInvoice(reservationId) {
@@ -166,12 +189,19 @@ const subscriptionAPI = {
 };
 
 const stationnementAPI = {
-    async exitParking(parkingId) {
-        return await apiCall(`/parkings/${parkingId}/exit`, 'POST');
+    async exitParking(stationnementId) {
+        // Le backend attend stationnement_id dans le body et l'URL doit matcher /parkings/{id}/exit
+        // L'ID dans l'URL n'est pas utilisé côté serveur, on peut donc réutiliser stationnementId.
+        return await apiCall(`/parkings/${stationnementId}/exit`, 'POST', {
+            stationnement_id: stationnementId
+        });
     },
 
     async getUserStationnements(userId) {
-        return await apiCall('/user/stationnements', 'GET');
+        const data = await apiCall('/user/stationnements', 'GET');
+        return {
+            stationnements: data.stationnements || data.data || []
+        };
     }
 };
 

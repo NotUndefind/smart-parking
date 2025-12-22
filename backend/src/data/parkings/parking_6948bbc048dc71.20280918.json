@@ -1,0 +1,84 @@
+{
+    "id": "parking_6948bbc048dc71.20280918",
+    "owner_id": "owner_6948617f179076.08780974",
+    "name": "Test",
+    "address": "Rue paronamique",
+    "latitude": 12124214,
+    "longitude": 42142142,
+    "total_spots": 30,
+    "tariffs": [
+        {
+            "duration": 15,
+            "price": 0.4
+        },
+        {
+            "duration": 30,
+            "price": 0.8
+        },
+        {
+            "duration": 45,
+            "price": 1.2
+        },
+        {
+            "duration": 60,
+            "price": 1.6
+        },
+        {
+            "duration": 75,
+            "price": 2
+        },
+        {
+            "duration": 90,
+            "price": 2.5
+        },
+        {
+            "duration": 105,
+            "price": 3
+        },
+        {
+            "duration": 120,
+            "price": 3.5
+        },
+        {
+            "duration": 135,
+            "price": 4
+        },
+        {
+            "duration": 150,
+            "price": 4.5
+        },
+        {
+            "duration": 165,
+            "price": 5
+        },
+        {
+            "duration": 180,
+            "price": 5.5
+        },
+        {
+            "duration": 195,
+            "price": 6
+        },
+        {
+            "duration": 210,
+            "price": 6.5
+        },
+        {
+            "duration": 225,
+            "price": 7
+        },
+        {
+            "duration": 240,
+            "price": 7.5
+        }
+    ],
+    "schedule": [
+        {
+            "day": "all",
+            "hours": "8h-18h"
+        }
+    ],
+    "is_active": true,
+    "created_at": "2025-12-22 03:32:16",
+    "updated_at": null
+}
