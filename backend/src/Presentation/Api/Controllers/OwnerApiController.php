@@ -331,12 +331,12 @@ final class OwnerApiController
                 return;
             }
 
-            $output = $this->listParkingReservationsUseCase->execute($parkingId, $ownerId);
+            $reservations = $this->listParkingReservationsUseCase->execute($parkingId);
 
             $this->jsonResponse([
                 "success" => true,
-                "reservations" => $output->reservations,
-                "count" => count($output->reservations)
+                "reservations" => array_map(fn($r) => $r->toArray(), $reservations),
+                "count" => count($reservations)
             ], 200);
 
         } catch (\Exception $e) {
@@ -355,12 +355,12 @@ final class OwnerApiController
                 return;
             }
 
-            $output = $this->listParkingStationnementsUseCase->execute($parkingId, $ownerId);
+            $stationnements = $this->listParkingStationnementsUseCase->execute($parkingId);
 
             $this->jsonResponse([
                 "success" => true,
-                "stationnements" => $output->stationnements,
-                "count" => count($output->stationnements)
+                "stationnements" => array_map(fn($s) => $s->toArray(), $stationnements),
+                "count" => count($stationnements)
             ], 200);
 
         } catch (\Exception $e) {
@@ -381,13 +381,7 @@ final class OwnerApiController
 
             $timestamp = (int) ($_GET["timestamp"] ?? time());
 
-            $input = GetAvailableSpotsAtTimeInput::create(
-                parkingId: $parkingId,
-                ownerId: $ownerId,
-                timestamp: $timestamp
-            );
-
-            $output = $this->getAvailableSpotsAtTimeUseCase->execute($input);
+            $output = $this->getAvailableSpotsAtTimeUseCase->execute($parkingId, $timestamp);
 
             $this->jsonResponse([
                 "success" => true,
@@ -395,7 +389,7 @@ final class OwnerApiController
                 "timestamp" => $timestamp,
                 "available_spots" => $output->availableSpots,
                 "total_spots" => $output->totalSpots,
-                "occupied_spots" => $output->totalSpots - $output->availableSpots
+                "occupied_spots" => $output->occupiedSpots
             ], 200);
 
         } catch (\Exception $e) {

@@ -1,0 +1,11 @@
+{
+    "id": "reservation_69493190033423.24018164",
+    "user_id": "user_6947467654d366.12864102",
+    "parking_id": "parking_demo_user",
+    "start_time": 1766922840,
+    "end_time": 1766940840,
+    "estimated_price": 96.00,
+    "status": "completed",
+    "created_at": "2025-12-22 11:54:56",
+    "updated_at": "2025-12-22 12:58:00"
+}

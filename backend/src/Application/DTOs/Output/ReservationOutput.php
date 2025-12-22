@@ -23,11 +23,11 @@ final class ReservationOutput
         return [
             'id' => $this->id,
             'parking_id' => $this->parkingId,
-            'parking_name' => $this->parkingName,
-            'start_time' => $this->startTime,
-            'end_time' => $this->endTime,
-            'estimated_price' => $this->estimatedPrice,
-            'status' => $this->status,
+            'parking_nom' => $this->parkingName,
+            'debut' => $this->startTime,
+            'fin' => $this->endTime,
+            'prix_estime' => $this->estimatedPrice,
+            'statut' => $this->status,
             'created_at' => $this->createdAt,
         ];
     }

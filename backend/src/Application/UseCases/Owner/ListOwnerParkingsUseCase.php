@@ -32,7 +32,7 @@ final class ListOwnerParkingsUseCase
                 'latitude' => $parking->getLatitude(),
                 'longitude' => $parking->getLongitude(),
                 'total_spots' => $parking->getTotalSpots(),
-                'available_spots' => $parking->getAvailableSpots(),
+                'available_spots' => $parking->getTotalSpots(), // TODO: Calculate based on active stationnements
                 'tariffs' => $parking->getTariffs(),
                 'schedule' => $parking->getSchedule(),
             ];

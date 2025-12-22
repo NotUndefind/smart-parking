@@ -1,0 +1,14 @@
+{
+    "id": "stationnement_69493eb1094238.87241952",
+    "user_id": "user_6947467654d366.12864102",
+    "parking_id": "parking_demo_user",
+    "reservation_id": "reservation_69493394b10418.04916514",
+    "subscription_id": null,
+    "entry_time": 1766407857,
+    "exit_time": 1766407865,
+    "final_price": 0,
+    "penalty_amount": 0,
+    "status": "completed",
+    "created_at": "2025-12-22 12:50:57",
+    "updated_at": "2025-12-22 12:51:05"
+}
