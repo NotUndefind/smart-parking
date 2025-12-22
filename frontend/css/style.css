@@ -174,13 +174,8 @@ nav a {
     transition: transform 0.3s;
 }
 
-.parking-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-}
-
 .parking-card h3 {
-    color: #667eea;
+    color: #666;
     margin-bottom: 0.5rem;
 }
 
@@ -192,7 +187,7 @@ nav a {
 .parking-card .price {
     font-size: 1.5rem;
     font-weight: bold;
-    color: #764ba2;
+    color: black;
     margin: 1rem 0;
 }
 
