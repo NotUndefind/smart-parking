@@ -8,11 +8,11 @@ final class AuthenticateOwnerInput
 {
     private function __construct(
         public readonly string $email,
-        public readonly string $passwordhash,
+        public readonly string $password,
     ) {}
 
-    public static function create(string $email, string $passwordhash): self
+    public static function create(string $email, string $password): self
     {
-        return new self(email: $email, passwordhash: $passwordhash);
+        return new self(email: $email, password: $password);
     }
 }

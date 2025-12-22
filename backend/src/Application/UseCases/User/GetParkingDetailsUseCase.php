@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Application\UseCases\User;
 
 use App\Application\DTOs\Output\ParkingDetailsOutput;
-use App\Domain\Exceptions\UserNotFoundException;
+use App\Domain\Exceptions\ParkingNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 use App\Domain\Repositories\ReservationRepositoryInterface;
 use App\Domain\Repositories\SubscriptionRepositoryInterface;
@@ -23,7 +23,7 @@ final class GetParkingDetailsUseCase
     {
         $parking = $this->parkingRepository->findById($parkingId);
         if ($parking === null) {
-            throw new UserNotFoundException('Parking not found');
+            throw new ParkingNotFoundException('Parking not found');
         }
 
         // Calculer les places disponibles à ce timestamp

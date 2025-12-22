@@ -1,18 +1,23 @@
 <?php
+
 declare(strict_types=1);
+
 namespace App\Application\DTOs\Input;
-final class GetMounthlyRevenueInput
+
+final class GetParkingDetailsInput
 {
     private function __construct(
         public readonly string $parkingId,
-        public readonly int $month,
-        public readonly int $year,
+        public readonly int $timestamp,
     ) {}
+
     public static function create(
         string $parkingId,
-        int $month,
-        int $year,
+        ?int $timestamp = null,
     ): self {
-        return new self(parkingId: $parkingId, month: $month, year: $year);
+        return new self(
+            parkingId: $parkingId,
+            timestamp: $timestamp ?? time()
+        );
     }
 }

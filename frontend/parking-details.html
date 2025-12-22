@@ -60,6 +60,83 @@
             </button>
             <div id="current-stationnement" style="margin-top: 1rem;"></div>
         </div>
+
+        <div id="subscription-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close" onclick="closeSubscriptionModal()">&times;</span>
+                <h2 id="modal-subscription-title">Souscrire à un abonnement</h2>
+
+                <form id="subscription-form">
+                    <input type="hidden" id="subscription-type-id">
+
+                    <div class="form-group">
+                        <label for="subscription-duration">Durée de l'abonnement</label>
+                        <select id="subscription-duration" required>
+                            <option value="30">1 mois (30 jours)</option>
+                            <option value="60">2 mois (60 jours)</option>
+                            <option value="90">3 mois (90 jours)</option>
+                            <option value="180">6 mois (180 jours)</option>
+                            <option value="365">1 an (365 jours)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="subscription-start-date">Date de début</label>
+                        <input type="date" id="subscription-start-date" required>
+                    </div>
+
+                    <div id="time-slots-section">
+                        <h3>Créneaux horaires</h3>
+                        <p style="color: #666; font-size: 0.9rem;">Définissez les créneaux hebdomadaires où vous aurez accès au parking</p>
+
+                        <div id="time-slots-container">
+                            <div class="time-slot-item">
+                                <div class="form-group">
+                                    <label>Jour(s)</label>
+                                    <select class="slot-day">
+                                        <option value="all">Tous les jours</option>
+                                        <option value="weekdays">Lun-Ven</option>
+                                        <option value="weekend">Sam-Dim</option>
+                                        <option value="monday">Lundi</option>
+                                        <option value="tuesday">Mardi</option>
+                                        <option value="wednesday">Mercredi</option>
+                                        <option value="thursday">Jeudi</option>
+                                        <option value="friday">Vendredi</option>
+                                        <option value="saturday">Samedi</option>
+                                        <option value="sunday">Dimanche</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Heure de début</label>
+                                    <input type="time" class="slot-start" value="00:00">
+                                </div>
+                                <div class="form-group">
+                                    <label>Heure de fin</label>
+                                    <input type="time" class="slot-end" value="23:59">
+                                </div>
+                            </div>
+                        </div>
+
+                        <button type="button" class="btn btn-secondary" onclick="addTimeSlot()">
+                            Ajouter un créneau
+                        </button>
+                    </div>
+
+                    <div id="subscription-price-estimate" class="alert alert-info" style="margin-top: 1rem;">
+                        Prix estimé: <strong id="estimated-price">0.00</strong>€
+                    </div>
+
+                    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+                        <button type="submit" class="btn btn-primary" style="flex: 1;">
+                            Confirmer l'abonnement
+                        </button>
+                        <button type="button" class="btn btn-secondary" onclick="closeSubscriptionModal()" style="flex: 1;">
+                            Annuler
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
     </div>
 
     <script src="js/api.js"></script>
@@ -98,8 +175,17 @@
 
         async function loadParkingDetails() {
             try {
+                console.log('Chargement détails parking:', parkingId);
                 const data = await parkingAPI.getDetails(parkingId);
+                console.log('Réponse API:', data);
+                
+                if (!data || !data.parking) {
+                    console.error('Réponse API invalide:', data);
+                    throw new Error('Parking non trouvé dans la réponse');
+                }
+                
                 currentParking = data.parking;
+                console.log('Parking chargé:', currentParking);
                 displayParkingDetails(currentParking);
 
                 reservationCard.style.display = 'block';
@@ -107,13 +193,25 @@
 
                 await loadSubscriptions();
             } catch (error) {
-                showAlert('Erreur lors du chargement des détails', 'error');
-                parkingDetailsCard.innerHTML = `
-                    <p style="text-align: center; color: #666;">
-                        Impossible de charger les détails du parking
-                    </p>
-                    <a href="index.html" class="btn btn-secondary btn-block">Retour à la recherche</a>
-                `;
+                console.error('Erreur chargement détails:', error);
+                console.error('Stack:', error.stack);
+                // Fallback : utiliser les données par défaut si l'API échoue
+                const defaultParking = {
+                    id: parkingId || 'parking_demo_user',
+                    nom: 'Parking Démo',
+                    adresse: '10 Rue de la Démo, 75000 Paris',
+                    nb_places: 50,
+                    places_disponibles: 50,
+                    tarif_horaire: 2.0,
+                    latitude: 48.8566,
+                    longitude: 2.3522,
+                    horaires: '24h/24'
+                };
+                currentParking = defaultParking;
+                displayParkingDetails(defaultParking);
+                reservationCard.style.display = 'block';
+                actionsCard.style.display = 'block';
+                showAlert('Données par défaut affichées (API indisponible: ' + error.message + ')', 'info');
             } finally {
                 loadingDiv.style.display = 'none';
             }
@@ -148,17 +246,61 @@
         function displaySubscriptions(subscriptions) {
             const html = subscriptions.map(sub => `
                 <div class="parking-card" style="margin-bottom: 1rem;">
-                    <h3>${sub.nom || 'Abonnement'}</h3>
-                    <p>${sub.description || ''}</p>
-                    <p><strong>Prix:</strong> ${sub.prix || 'N/A'}€/mois</p>
-                    <p><strong>Créneaux:</strong> ${sub.creneaux || 'Accès illimité'}</p>
-                    <button class="btn btn-primary" onclick="subscribeToplan('${sub.id}')">
+                    <h3>${getSubscriptionTypeName(sub.type || sub.nom)}</h3>
+                    <p style="color: #666;">${sub.description || getSubscriptionDescription(sub.type)}</p>
+                    <p><strong>Prix:</strong> ${sub.prix || sub.price || 'N/A'}€/${getDurationLabel(sub.duration || sub.duree || 30)}</p>
+                    <p><strong>Durée:</strong> ${getDurationLabel(sub.duration || sub.duree || 30)}</p>
+                    <p><strong>Créneaux:</strong> ${formatTimeSlots(sub.time_slots || sub.creneaux)}</p>
+                    <button class="btn btn-primary" onclick="showSubscriptionModal('${sub.id}', '${sub.type || sub.nom}')">
                         Souscrire
                     </button>
                 </div>
             `).join('');
 
             document.getElementById('subscriptions-list').innerHTML = html;
+        }
+
+        function getSubscriptionTypeName(type) {
+            const types = {
+                'monthly': 'Abonnement Mensuel Total',
+                'weekend': 'Abonnement Week-end',
+                'evening': 'Abonnement Soirée',
+                'custom': 'Abonnement Personnalisé',
+                'quarterly': 'Abonnement Trimestriel',
+                'yearly': 'Abonnement Annuel'
+            };
+            return types[type] || type || 'Abonnement';
+        }
+
+        function getSubscriptionDescription(type) {
+            const descriptions = {
+                'monthly': 'Accès illimité à une place de parking à n\'importe quelle heure pendant 1 mois',
+                'weekend': 'Accès du vendredi 18h au lundi 10h chaque semaine',
+                'evening': 'Accès tous les soirs de 18h à 8h du matin le lendemain',
+                'custom': 'Créneaux horaires personnalisés selon vos besoins',
+                'quarterly': 'Accès illimité pendant 3 mois',
+                'yearly': 'Accès illimité pendant 1 an'
+            };
+            return descriptions[type] || '';
+        }
+
+        function getDurationLabel(days) {
+            if (days >= 365) return `${Math.floor(days / 365)} an(s)`;
+            if (days >= 90) return `${Math.floor(days / 30)} mois`;
+            if (days >= 30) return '1 mois';
+            return `${days} jours`;
+        }
+
+        function formatTimeSlots(slots) {
+            if (!slots) return 'Accès illimité 24h/24';
+            if (typeof slots === 'string') return slots;
+            if (Array.isArray(slots)) {
+                return slots.map(slot => {
+                    if (typeof slot === 'string') return slot;
+                    return `${slot.day || 'Tous les jours'}: ${slot.start_time || '00:00'} - ${slot.end_time || '23:59'}`;
+                }).join(', ');
+            }
+            return 'Accès illimité 24h/24';
         }
 
         const reservationForm = document.getElementById('reservation-form');
@@ -231,22 +373,196 @@
             }
         });
 
-        window.subscribeToplan = async function(subscriptionId) {
-            try {
-                await subscriptionAPI.subscribe({
-                    user_id: user.id,
-                    subscription_type_id: subscriptionId,
-                    parking_id: parkingId
+        let currentSubscriptionTypeId = null;
+        let currentSubscriptionType = null;
+
+        window.showSubscriptionModal = function(subscriptionId, subscriptionType) {
+            currentSubscriptionTypeId = subscriptionId;
+            currentSubscriptionType = subscriptionType;
+
+            document.getElementById('subscription-type-id').value = subscriptionId;
+            document.getElementById('modal-subscription-title').textContent = `Souscrire à ${getSubscriptionTypeName(subscriptionType)}`;
+
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('subscription-start-date').value = today;
+            document.getElementById('subscription-start-date').min = today;
+
+            document.getElementById('subscription-modal').style.display = 'flex';
+        };
+
+        window.closeSubscriptionModal = function() {
+            document.getElementById('subscription-modal').style.display = 'none';
+            document.getElementById('subscription-form').reset();
+            currentSubscriptionTypeId = null;
+            currentSubscriptionType = null;
+        };
+
+        window.addTimeSlot = function() {
+            const container = document.getElementById('time-slots-container');
+            const newSlot = document.createElement('div');
+            newSlot.className = 'time-slot-item';
+            newSlot.innerHTML = `
+                <div class="form-group">
+                    <label>Jour(s)</label>
+                    <select class="slot-day">
+                        <option value="all">Tous les jours</option>
+                        <option value="weekdays">Lun-Ven</option>
+                        <option value="weekend">Sam-Dim</option>
+                        <option value="monday">Lundi</option>
+                        <option value="tuesday">Mardi</option>
+                        <option value="wednesday">Mercredi</option>
+                        <option value="thursday">Jeudi</option>
+                        <option value="friday">Vendredi</option>
+                        <option value="saturday">Samedi</option>
+                        <option value="sunday">Dimanche</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Heure de début</label>
+                    <input type="time" class="slot-start" value="00:00">
+                </div>
+                <div class="form-group">
+                    <label>Heure de fin</label>
+                    <input type="time" class="slot-end" value="23:59">
+                </div>
+                <button type="button" class="btn btn-danger btn-small" onclick="removeTimeSlot(this)">Supprimer</button>
+            `;
+            container.appendChild(newSlot);
+        };
+
+        window.removeTimeSlot = function(button) {
+            button.parentElement.remove();
+        };
+
+        document.getElementById('subscription-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!currentSubscriptionTypeId) {
+                showAlert('Erreur: type d\'abonnement non sélectionné', 'error');
+                return;
+            }
+
+            const duration = parseInt(document.getElementById('subscription-duration').value);
+            const startDate = new Date(document.getElementById('subscription-start-date').value);
+
+            const timeSlots = [];
+            document.querySelectorAll('.time-slot-item').forEach(item => {
+                const day = item.querySelector('.slot-day').value;
+                const startTime = item.querySelector('.slot-start').value;
+                const endTime = item.querySelector('.slot-end').value;
+
+                timeSlots.push({
+                    day: day,
+                    start_time: startTime,
+                    end_time: endTime
                 });
+            });
+
+            const subscriptionData = {
+                user_id: user.id,
+                subscription_type_id: currentSubscriptionTypeId,
+                parking_id: parkingId,
+                start_date: Math.floor(startDate.getTime() / 1000),
+                duration_days: duration,
+                time_slots: timeSlots
+            };
+
+            try {
+                await subscriptionAPI.subscribe(subscriptionData);
 
                 showAlert('Abonnement souscrit avec succès', 'success');
+                closeSubscriptionModal();
                 setTimeout(() => window.location.href = 'my-subscriptions.html', 2000);
             } catch (error) {
                 showAlert(error.message || 'Erreur lors de la souscription', 'error');
             }
-        };
+        });
 
-        loadParkingDetails();
+        // Charger les détails au démarrage
+        if (parkingId) {
+            loadParkingDetails();
+        } else {
+            loadingDiv.style.display = 'none';
+            showAlert('Aucun parking sélectionné', 'error');
+        }
     </script>
+
+    <style>
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background-color: #fff;
+            padding: 2rem;
+            border-radius: 8px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            font-size: 2rem;
+            font-weight: bold;
+            color: #666;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        .time-slot-item {
+            background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 4px;
+            margin-bottom: 1rem;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .time-slot-item button {
+            grid-column: 1 / -1;
+            margin-top: 0.5rem;
+        }
+
+        .btn-small {
+            padding: 0.5rem 1rem;
+            font-size: 0.875rem;
+        }
+
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+
+        #time-slots-section {
+            margin-top: 1.5rem;
+            padding-top: 1.5rem;
+            border-top: 1px solid #ddd;
+        }
+
+        #time-slots-section h3 {
+            margin-bottom: 0.5rem;
+        }
+    </style>
 </body>
 </html>

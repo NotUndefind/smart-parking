@@ -62,7 +62,6 @@ final class JWTService
 
             [$base64UrlHeader, $base64UrlPayload, $base64UrlSignature] = $parts;
 
-            // Vérifier la signature
             $signature = hash_hmac('sha256', $base64UrlHeader . "." . $base64UrlPayload, $this->secret, true);
             $expectedSignature = $this->base64UrlEncode($signature);
 
