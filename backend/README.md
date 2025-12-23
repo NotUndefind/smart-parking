@@ -1,63 +1,121 @@
-# Smart Parkings
+# Smart Parkings - Backend
 
-Projet fil rouge pour structurer une plateforme de gestion de parkings connectés. Le dépôt suit une Clean Architecture stricte pour séparer la logique métier des détails techniques et faciliter les contributions en équipe.
+Application de gestion de parkings partagés en **PHP 8.2+ pur** (Clean Architecture).
 
-## Architecture
+## 🚀 Démarrage Rapide
 
-- `Domain` définit les entités, les règles métiers et les interfaces de repository. Aucun accès technique direct.
-- `Application` orchestre les cas d’usage via des services (`UseCases/`), manipule des DTOs et valide les entrées/sorties.
-- `Infrastructure` implémente les contrats du domaine (SQL, fichiers, services externes, sécurité, etc.).
-- `Presentation` regroupe les contrôleurs API et Web, le middleware et les vues Blade-like.
-- `public/` sert de front controller (ex: `php -S localhost:8000 -t public`).
+```bash
+# Installation
+composer install
 
-Des explications détaillées sont disponibles dans `aiRule/Architecture.md`, `aiRule/Development.md` et `aiRule/GlobalContext.md`.
+# Lancer les tests
+vendor/bin/phpunit
 
-## Répartition des dossiers principaux
+# Démarrer le serveur
+php -S localhost:8000 -t public/
+```
+
+## 📋 Pré-requis
+
+- **PHP** ≥ 8.2 (avec `ext-json`, `ext-pdo`)
+- **Composer** ≥ 2.0
+- **MySQL** ≥ 8.0 (optionnel, mode SQL uniquement)
+
+## ⚙️ Configuration
+
+### Mode de stockage
+
+```bash
+# Par défaut : fichiers JSON (aucune DB requise)
+export STORAGE_TYPE=file
+
+# Mode MySQL
+export STORAGE_TYPE=sql
+```
+
+### Base de données (mode SQL uniquement)
+
+1. Créer la base :
+```bash
+mysql -u root -p -e "CREATE DATABASE smart_parking"
+```
+
+2. Éditer `config/database.php` avec vos credentials
+
+### JWT
+
+Éditer `config/jwt.php` pour changer la clé secrète en production.
+
+## 🧪 Tests
+
+```bash
+# Tous les tests
+vendor/bin/phpunit
+
+# Avec couverture
+vendor/bin/phpunit --coverage-text
+
+# Rapport HTML
+vendor/bin/phpunit --coverage-html coverage/
+```
+
+**Couverture actuelle** : 78.24% (objectif 60% atteint ✅)
+
+## 📡 API Endpoints
+
+### Auth (public)
+- `POST /api/auth/register/user` - Inscription utilisateur
+- `POST /api/auth/login` - Connexion
+- `POST /api/auth/register/owner` - Inscription propriétaire
+
+### User (🔒 JWT requis)
+- `GET /api/parkings/search` - Rechercher parkings
+- `POST /api/reservations` - Créer réservation
+- `POST /api/stationnements/enter` - Entrer parking
+- `POST /api/stationnements/exit` - Sortir parking
+- `POST /api/invoices/generate` - Générer facture
+
+### Owner (🔒 JWT requis)
+- `POST /api/owner/parkings` - Créer parking
+- `PUT /api/owner/parkings/{id}/tariff` - Mettre à jour tarifs
+- `GET /api/owner/parkings/{id}/revenue` - Chiffre d'affaires
+
+**Auth** : Header `Authorization: Bearer <token>`
+
+## 🏗️ Architecture
 
 ```
 src/
-├── Domain/            # Entités, exceptions, interfaces de repository
-├── Application/       # Use cases, DTOs, validators
-├── Infrastructure/    # Implémentations (SQL, fichiers, services techniques)
-└── Presentation/      # API controllers, middleware, vues
+├── Domain/              # Entités, interfaces, logique métier
+├── Application/         # Use cases, DTOs, validators
+├── Infrastructure/      # Implémentations (SQL, fichiers, JWT)
+└── Presentation/        # API controllers, middleware
 ```
 
-Autres emplacements utiles :
+**Principe** : Dépendances vers l'intérieur uniquement (Domain → Application → Infrastructure/Presentation)
 
-- `config/` : fichiers de configuration applicative.
-- `data/` : jeux de données ou fixtures.
-- `public/` : point d’entrée HTTP.
-- `tests/` : suites PHPUnit.
-- `aiRule/` : documentation projet et règles d’architecture.
+## 📚 Documentation
 
-## Pré-requis
+- `aiRule/Architecture.md` - Détails architecture Clean
+- `aiRule/Development.md` - Conventions, workflow Git
+- `aiRule/GlobalContext.md` - Règles métier, barème
 
-- PHP 8.2+ (CLI) avec `ext-json`.
-- Composer 2.x.
+## 🔒 Sécurité
 
-## Installation locale
+✅ JWT (`firebase/php-jwt`)
+✅ Bcrypt (`password_hash`)
+✅ Prepared statements (SQL)
+✅ Validators (Email, Password, GPS)
 
-```bash
-composer install
-```
+## 📊 Barème Projet
 
-## Lancer les tests
+- 12 pts : Fonctionnalités complètes
+- **4 pts : Tests PHPUnit (60% couverture) ✅**
+- 2 pts : Authentification JWT ✅
+- 2 pts : Architecture Clean ✅
 
-```bash
-./vendor/bin/phpunit
-```
+**Deadline** : 22 décembre 2025, 23h59
 
-## Bonnes pratiques pour contribuer
+---
 
-- Respecter la séparation des couches (dépendances vers l’intérieur uniquement).
-- Créer ou mettre à jour les DTOs et validateurs lors de nouveaux use cases.
-- Implémenter les interfaces du domaine dans `Infrastructure` et injecter ces implémentations via les contrôleurs ou le bootstrap.
-- Documenter les décisions techniques supplémentaires dans `aiRule/`.
-
-## Aller plus loin
-
-- `aiRule/Architecture.md` : détail complet des couches.
-- `aiRule/Development.md` : conventions de code, workflow Git, checklist qualité.
-- `aiRule/GlobalContext.md` : contexte métier et objectifs fonctionnels.
-
-Ces documents servent de référence pour garder le projet aligné avec les attentes pédagogiques.
+**Version** : 1.0 | **Équipe** : 4 personnes
