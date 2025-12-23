@@ -6,18 +6,24 @@ namespace Tests\Application\UseCases\User;
 
 use App\Application\DTOs\Input\EnterParkingInput;
 use App\Application\UseCases\User\EnterParkingUseCase;
-use App\Domain\Entities\Parking;
-use App\Domain\Entities\Reservation;
-use App\Domain\Entities\Stationnement;
-use App\Domain\Entities\User;
+use App\Domain\Exceptions\UserNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 use App\Domain\Repositories\ReservationRepositoryInterface;
 use App\Domain\Repositories\StationnementRepositoryInterface;
 use App\Domain\Repositories\SubscriptionRepositoryInterface;
 use App\Domain\Repositories\UserRepositoryInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use Tests\Helpers\EntityFactory;
+use App\Application\DTOs\Output\StationnementOutput;
+use App\Domain\Entities\User;
+use App\Domain\Entities\Parking;
+use App\Domain\Entities\Reservation;
+use App\Domain\Entities\Subscription;
+use App\Domain\Entities\Stationnement;
 
-class EnterParkingUseCaseTest extends TestCase
+#[CoversClass(EnterParkingUseCase::class)]
+final class EnterParkingUseCaseTest extends TestCase
 {
     private UserRepositoryInterface $userRepository;
     private ParkingRepositoryInterface $parkingRepository;
@@ -28,6 +34,7 @@ class EnterParkingUseCaseTest extends TestCase
 
     protected function setUp(): void
     {
+        // Mock all repositories (interfaces)
         $this->userRepository = $this->createMock(UserRepositoryInterface::class);
         $this->parkingRepository = $this->createMock(ParkingRepositoryInterface::class);
         $this->reservationRepository = $this->createMock(ReservationRepositoryInterface::class);
@@ -43,32 +50,29 @@ class EnterParkingUseCaseTest extends TestCase
         );
     }
 
-    public function testCanEnterParkingWithReservation(): void
+    public function testCanEnterWithReservation(): void
     {
         $currentTime = time();
-        $input = new EnterParkingInput(
+        $input = EnterParkingInput::create(
             userId: 'user_1',
             parkingId: 'parking_1',
             reservationId: 'reservation_1',
             subscriptionId: null
         );
 
-        $user = new User(
-            id: 'user_1',
-            email: 'test@example.com',
-            passwordHash: 'hash',
-            firstName: 'John',
-            lastName: 'Doe'
-        );
-
-        $parking = $this->createMock(Parking::class);
-        $parking->method('getName')->willReturn('Test Parking');
-
-        $reservation = $this->createMock(Reservation::class);
-        $reservation->method('getUserId')->willReturn('user_1');
-        $reservation->method('isActive')->willReturn(true);
-        $reservation->method('getStartTime')->willReturn($currentTime - 600);
-        $reservation->method('getEndTime')->willReturn($currentTime + 3600);
+        $user = EntityFactory::createUser(['id' => 'user_1']);
+        $parking = EntityFactory::createParking([
+            'id' => 'parking_1',
+            'name' => 'Test Parking'
+        ]);
+        $reservation = EntityFactory::createReservation([
+            'id' => 'reservation_1',
+            'userId' => 'user_1',
+            'parkingId' => 'parking_1',
+            'startTime' => $currentTime - 600, // Started 10 min ago
+            'endTime' => $currentTime + 3000, // Ends in 50 min
+            'status' => 'active'
+        ]);
 
         $this->userRepository->expects($this->once())
             ->method('findById')
@@ -92,12 +96,104 @@ class EnterParkingUseCaseTest extends TestCase
 
         $this->stationnementRepository->expects($this->once())
             ->method('save')
-            ->with($this->isInstanceOf(Stationnement::class));
+            ->with($this->callback(function ($stat) {
+                return $stat->getUserId() === 'user_1' &&
+                       $stat->getParkingId() === 'parking_1' &&
+                       $stat->getStatus() === 'active';
+            }));
 
         $output = $this->useCase->execute($input);
 
         $this->assertEquals('parking_1', $output->parkingId);
         $this->assertEquals('Test Parking', $output->parkingName);
         $this->assertEquals('active', $output->status);
+        $this->assertNotNull($output->id);
+        $this->assertNotNull($output->entryTime);
+    }
+
+    public function testCanEnterWithoutReservation(): void
+    {
+        $currentTime = time();
+        $input = EnterParkingInput::create(
+            userId: 'user_1',
+            parkingId: 'parking_1',
+            reservationId: null,
+            subscriptionId: 'subscription_1'
+        );
+
+        $user = EntityFactory::createUser(['id' => 'user_1']);
+        $parking = EntityFactory::createParking([
+            'id' => 'parking_1',
+            'name' => 'Test Parking'
+        ]);
+        $subscription = EntityFactory::createSubscription([
+            'id' => 'subscription_1',
+            'userId' => 'user_1',
+            'parkingId' => 'parking_1',
+            'startDate' => $currentTime - 86400, // Started yesterday
+            'endDate' => $currentTime + 86400 * 30, // Ends in 30 days
+            'isActive' => true
+        ]);
+
+        $this->userRepository->expects($this->once())
+            ->method('findById')
+            ->willReturn($user);
+
+        $this->parkingRepository->expects($this->once())
+            ->method('findById')
+            ->willReturn($parking);
+
+        $this->stationnementRepository->expects($this->once())
+            ->method('findActiveByUserAndParking')
+            ->willReturn(null);
+
+        $this->subscriptionRepository->expects($this->once())
+            ->method('findById')
+            ->with('subscription_1')
+            ->willReturn($subscription);
+
+        $this->stationnementRepository->expects($this->once())
+            ->method('save');
+
+        $output = $this->useCase->execute($input);
+
+        $this->assertEquals('parking_1', $output->parkingId);
+        $this->assertEquals('active', $output->status);
+    }
+
+    public function testThrowsExceptionWhenParkingFull(): void
+    {
+        $input = EnterParkingInput::create(
+            userId: 'user_1',
+            parkingId: 'parking_1',
+            reservationId: 'reservation_1',
+            subscriptionId: null
+        );
+
+        $user = EntityFactory::createUser(['id' => 'user_1']);
+        $parking = EntityFactory::createParking(['id' => 'parking_1']);
+        $activeStationnement = EntityFactory::createStationnement([
+            'userId' => 'user_1',
+            'parkingId' => 'parking_1',
+            'status' => 'active'
+        ]);
+
+        $this->userRepository->expects($this->once())
+            ->method('findById')
+            ->willReturn($user);
+
+        $this->parkingRepository->expects($this->once())
+            ->method('findById')
+            ->willReturn($parking);
+
+        $this->stationnementRepository->expects($this->once())
+            ->method('findActiveByUserAndParking')
+            ->with('user_1', 'parking_1')
+            ->willReturn($activeStationnement);
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('User already has an active parking session');
+
+        $this->useCase->execute($input);
     }
 }

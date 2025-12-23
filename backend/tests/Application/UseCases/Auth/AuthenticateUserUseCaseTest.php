@@ -6,113 +6,120 @@ namespace Tests\Application\UseCases\Auth;
 
 use App\Application\DTOs\Input\AuthenticateUserInput;
 use App\Application\UseCases\Auth\AuthenticateUserUseCase;
-use App\Domain\Entities\User;
-use App\Domain\Exceptions\User\InvalidCredentialsException;
+use App\Domain\Exceptions\InvalidCredentialsException;
 use App\Domain\Repositories\UserRepositoryInterface;
 use App\Infrastructure\Security\JWTService;
 use App\Infrastructure\Security\PasswordHasher;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use Tests\Helpers\EntityFactory;
+use App\Application\DTOs\Output\AuthTokenOutput;
+use App\Application\DTOs\Output\UserOutput;
+use App\Domain\Entities\User;
 
-class AuthenticateUserUseCaseTest extends TestCase
+#[CoversClass(AuthenticateUserUseCase::class)]
+#[CoversClass(User::class)]
+final class AuthenticateUserUseCaseTest extends TestCase
 {
     private UserRepositoryInterface $userRepository;
-    private PasswordHasher $passwordHasher;
-    private JWTService $jwtService;
-    private AuthenticateUserUseCaseTest $useCase;
+    private AuthenticateUserUseCase $useCase;
 
     protected function setUp(): void
     {
-        $this->userRepository = $this->createMock(UserRepositoryInterface::class);
-        $this->passwordHasher = $this->createMock(PasswordHasher::class);
-        $this->jwtService = $this->createMock(JWTService::class);
+        // Mock repository (interface)
+        $this->userRepository = $this->createMock(
+            UserRepositoryInterface::class,
+        );
+
+        // Use real instances of services (lightweight, no external dependencies)
+        $passwordHasher = new PasswordHasher();
+        $jwtService = new JWTService("test-secret-key");
 
         $this->useCase = new AuthenticateUserUseCase(
             $this->userRepository,
-            $this->passwordHasher,
-            $this->jwtService
+            $passwordHasher,
+            $jwtService,
         );
     }
 
-    public function testCanAuthenticateUser(): void
+    public function testSuccessfulAuthentication(): void
     {
-        $input = new AuthenticateUserInput(
-            email: 'test@example.com',
-            password: 'Password123!'
+        $input = AuthenticateUserInput::create(
+            email: "test@example.com",
+            password: "Password123!",
         );
 
-        $user = new User(
-            id: 'user_1',
-            email: 'test@example.com',
-            passwordHash: 'hashed_password',
-            firstName: 'John',
-            lastName: 'Doe'
-        );
+        // Create a user with a real hashed password
+        $passwordHasher = new PasswordHasher();
+        $hashedPassword = $passwordHasher->hash("Password123!");
 
-        $this->userRepository->expects($this->once())
-            ->method('findByEmail')
-            ->with($input->email)
+        $user = EntityFactory::createUser([
+            "email" => "test@example.com",
+            "passwordHash" => $hashedPassword,
+            "firstName" => "John",
+            "lastName" => "Doe",
+        ]);
+
+        $this->userRepository
+            ->expects($this->once())
+            ->method("findByEmail")
+            ->with("test@example.com")
             ->willReturn($user);
-
-        $this->passwordHasher->expects($this->once())
-            ->method('verify')
-            ->with($input->password, 'hashed_password')
-            ->willReturn(true);
-
-        $this->jwtService->expects($this->once())
-            ->method('generateToken')
-            ->with('user_1', 'test@example.com', 'user')
-            ->willReturn('jwt_token_here');
 
         $output = $this->useCase->execute($input);
 
-        $this->assertEquals('jwt_token_here', $output->token);
-        $this->assertEquals('Bearer', $output->type);
+        $this->assertNotEmpty($output->token);
+        $this->assertEquals("Bearer", $output->type);
         $this->assertEquals(3600, $output->expiresIn);
+        $this->assertEquals("test@example.com", $output->user->email);
+        $this->assertEquals("John", $output->user->firstName);
+        $this->assertEquals("Doe", $output->user->lastName);
+        $this->assertEquals("John Doe", $output->user->fullName);
     }
 
     public function testThrowsExceptionWhenUserNotFound(): void
     {
-        $input = new AuthenticateUserInput(
-            email: 'notfound@example.com',
-            password: 'Password123!'
+        $input = AuthenticateUserInput::create(
+            email: "notfound@example.com",
+            password: "Password123!",
         );
 
-        $this->userRepository->expects($this->once())
-            ->method('findByEmail')
-            ->with($input->email)
+        $this->userRepository
+            ->expects($this->once())
+            ->method("findByEmail")
+            ->with("notfound@example.com")
             ->willReturn(null);
 
         $this->expectException(InvalidCredentialsException::class);
+        $this->expectExceptionMessage("Invalid email or password");
 
         $this->useCase->execute($input);
     }
 
     public function testThrowsExceptionWhenPasswordInvalid(): void
     {
-        $input = new AuthenticateUserInput(
-            email: 'test@example.com',
-            password: 'WrongPassword'
+        $input = AuthenticateUserInput::create(
+            email: "test@example.com",
+            password: "WrongPassword",
         );
 
-        $user = new User(
-            id: 'user_1',
-            email: 'test@example.com',
-            passwordHash: 'hashed_password',
-            firstName: 'John',
-            lastName: 'Doe'
-        );
+        // Create a user with a different password
+        $passwordHasher = new PasswordHasher();
+        $hashedPassword = $passwordHasher->hash("CorrectPassword");
 
-        $this->userRepository->expects($this->once())
-            ->method('findByEmail')
-            ->with($input->email)
+        $user = EntityFactory::createUser([
+            "email" => "test@example.com",
+            "passwordHash" => $hashedPassword,
+        ]);
+
+        $this->userRepository
+            ->expects($this->once())
+            ->method("findByEmail")
+            ->with("test@example.com")
             ->willReturn($user);
 
-        $this->passwordHasher->expects($this->once())
-            ->method('verify')
-            ->with($input->password, 'hashed_password')
-            ->willReturn(false);
-
         $this->expectException(InvalidCredentialsException::class);
+        $this->expectExceptionMessage("Invalid email or password");
 
         $this->useCase->execute($input);
     }

@@ -4,16 +4,20 @@ declare(strict_types=1);
 
 namespace Tests\Application\UseCases\Owner;
 
-use App\Application\DTOs\Input\AuthenticateOwnerInput;
 use App\Application\UseCases\Owner\AuthenticateOwnerUseCase;
-use App\Domain\Entities\Owner;
-use App\Domain\Exceptions\User\InvalidCredentialsException;
+use App\Application\DTOs\Input\AuthenticateOwnerInput;
+use App\Domain\Exceptions\InvalidCredentialsException;
 use App\Domain\Repositories\OwnerRepositoryInterface;
 use App\Infrastructure\Security\JWTService;
 use App\Infrastructure\Security\PasswordHasher;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use Tests\Helpers\EntityFactory;
+use App\Domain\Entities\Owner;
 
-class AuthenticateOwnerUseCaseTest extends TestCase
+#[CoversClass(AuthenticateOwnerUseCase::class)]
+#[CoversClass(Owner::class)]
+final class AuthenticateOwnerUseCaseTest extends TestCase
 {
     private OwnerRepositoryInterface $ownerRepository;
     private PasswordHasher $passwordHasher;
@@ -23,8 +27,8 @@ class AuthenticateOwnerUseCaseTest extends TestCase
     protected function setUp(): void
     {
         $this->ownerRepository = $this->createMock(OwnerRepositoryInterface::class);
-        $this->passwordHasher = $this->createMock(PasswordHasher::class);
-        $this->jwtService = $this->createMock(JWTService::class);
+        $this->passwordHasher = new PasswordHasher();
+        $this->jwtService = new JWTService("test-secret-key");
 
         $this->useCase = new AuthenticateOwnerUseCase(
             $this->ownerRepository,
@@ -33,88 +37,75 @@ class AuthenticateOwnerUseCaseTest extends TestCase
         );
     }
 
-    public function testCanAuthenticateOwner(): void
+    public function testSuccessfulAuthentication(): void
     {
-        $input = new AuthenticateOwnerInput(
-            email: 'owner@example.com',
-            password: 'Password123!'
-        );
+        $hashedPassword = $this->passwordHasher->hash('correct_password');
 
-        $owner = new Owner(
-            id: 'owner_1',
+        $owner = EntityFactory::createOwner([
+            'id' => 'owner_1',
+            'email' => 'owner@example.com',
+            'passwordHash' => $hashedPassword,
+            'companyName' => 'Test Company'
+        ]);
+
+        $input = AuthenticateOwnerInput::create(
             email: 'owner@example.com',
-            passwordHash: 'hashed_password',
-            companyName: 'Test Company',
-            firstName: 'John',
-            lastName: 'Doe'
+            password: 'correct_password'
         );
 
         $this->ownerRepository->expects($this->once())
             ->method('findByEmail')
-            ->with($input->email)
+            ->with('owner@example.com')
             ->willReturn($owner);
 
-        $this->passwordHasher->expects($this->once())
-            ->method('verify')
-            ->with($input->password, 'hashed_password')
-            ->willReturn(true);
+        $result = $this->useCase->execute($input);
 
-        $this->jwtService->expects($this->once())
-            ->method('generateToken')
-            ->with('owner_1', 'owner@example.com', 'owner')
-            ->willReturn('jwt_token_here');
-
-        $output = $this->useCase->execute($input);
-
-        $this->assertEquals('jwt_token_here', $output->token);
-        $this->assertEquals('Bearer', $output->type);
-        $this->assertEquals(3600, $output->expiresIn);
+        $this->assertNotEmpty($result->token);
+        $this->assertEquals('Bearer', $result->type);
+        $this->assertEquals(3600, $result->expiresIn);
+        $this->assertEquals('owner_1', $result->user->id);
+        $this->assertEquals('owner@example.com', $result->user->email);
     }
 
     public function testThrowsExceptionWhenOwnerNotFound(): void
     {
-        $input = new AuthenticateOwnerInput(
-            email: 'notfound@example.com',
-            password: 'Password123!'
+        $input = AuthenticateOwnerInput::create(
+            email: 'nonexistent@example.com',
+            password: 'any_password'
         );
 
         $this->ownerRepository->expects($this->once())
             ->method('findByEmail')
-            ->with($input->email)
+            ->with('nonexistent@example.com')
             ->willReturn(null);
 
         $this->expectException(InvalidCredentialsException::class);
+        $this->expectExceptionMessage('Invalid email or password');
 
         $this->useCase->execute($input);
     }
 
     public function testThrowsExceptionWhenPasswordInvalid(): void
     {
-        $input = new AuthenticateOwnerInput(
-            email: 'owner@example.com',
-            password: 'WrongPassword'
-        );
+        $hashedPassword = $this->passwordHasher->hash('correct_password');
 
-        $owner = new Owner(
-            id: 'owner_1',
+        $owner = EntityFactory::createOwner([
+            'email' => 'owner@example.com',
+            'passwordHash' => $hashedPassword
+        ]);
+
+        $input = AuthenticateOwnerInput::create(
             email: 'owner@example.com',
-            passwordHash: 'hashed_password',
-            companyName: 'Test Company',
-            firstName: 'John',
-            lastName: 'Doe'
+            password: 'wrong_password'
         );
 
         $this->ownerRepository->expects($this->once())
             ->method('findByEmail')
-            ->with($input->email)
+            ->with('owner@example.com')
             ->willReturn($owner);
 
-        $this->passwordHasher->expects($this->once())
-            ->method('verify')
-            ->with($input->password, 'hashed_password')
-            ->willReturn(false);
-
         $this->expectException(InvalidCredentialsException::class);
+        $this->expectExceptionMessage('Invalid email or password');
 
         $this->useCase->execute($input);
     }
