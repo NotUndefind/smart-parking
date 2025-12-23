@@ -33,7 +33,8 @@ final class ListUserReservationsUseCase
                 endTime: $reservation->getEndTime(),
                 estimatedPrice: $reservation->getEstimatedPrice(),
                 status: $reservation->getStatus(),
-                createdAt: $reservation->getCreatedAt()->format('Y-m-d H:i:s')
+                createdAt: $reservation->getCreatedAt()->format('Y-m-d H:i:s'),
+                userEmail: null
             );
         }, $reservations);
     }

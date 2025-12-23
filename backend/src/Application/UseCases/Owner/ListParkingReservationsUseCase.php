@@ -8,12 +8,14 @@ use App\Application\DTOs\Output\ReservationOutput;
 use App\Domain\Exceptions\ParkingNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 use App\Domain\Repositories\ReservationRepositoryInterface;
+use App\Domain\Repositories\UserRepositoryInterface;
 
 final class ListParkingReservationsUseCase
 {
     public function __construct(
         private ReservationRepositoryInterface $reservationRepository,
-        private ParkingRepositoryInterface $parkingRepository
+        private ParkingRepositoryInterface $parkingRepository,
+        private UserRepositoryInterface $userRepository
     ) {
     }
 
@@ -33,6 +35,7 @@ final class ListParkingReservationsUseCase
 
         // 3. Retourner les DTOs Output
         return array_map(function ($reservation) use ($parking) {
+            $user = $this->userRepository->findById($reservation->getUserId());
             return new ReservationOutput(
                 id: $reservation->getId(),
                 parkingId: $reservation->getParkingId(),
@@ -41,7 +44,8 @@ final class ListParkingReservationsUseCase
                 endTime: $reservation->getEndTime(),
                 estimatedPrice: $reservation->getEstimatedPrice(),
                 status: $reservation->getStatus(),
-                createdAt: $reservation->getCreatedAt()->format('Y-m-d H:i:s')
+                createdAt: $reservation->getCreatedAt()->format('Y-m-d H:i:s'),
+                userEmail: $user?->getEmail()
             );
         }, $reservations);
     }

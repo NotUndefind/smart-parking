@@ -14,7 +14,8 @@ final class ReservationOutput
         public readonly int $endTime,
         public readonly float $estimatedPrice,
         public readonly string $status,
-        public readonly string $createdAt
+        public readonly string $createdAt,
+        public readonly ?string $userEmail = null
     ) {
     }
 
@@ -29,6 +30,7 @@ final class ReservationOutput
             'prix_estime' => $this->estimatedPrice,
             'statut' => $this->status,
             'created_at' => $this->createdAt,
+            'user_email' => $this->userEmail,
         ];
     }
 }

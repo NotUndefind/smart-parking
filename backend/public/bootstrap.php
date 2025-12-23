@@ -235,12 +235,14 @@ $addSubscriptionTypeUseCase = new AddSubscriptionTypeUseCase(
 
 $listParkingReservationsUseCase = new ListParkingReservationsUseCase(
     reservationRepository: $reservationRepository,
-    parkingRepository: $parkingRepository
+    parkingRepository: $parkingRepository,
+    userRepository: $userRepository
 );
 
 $listParkingStationnementsUseCase = new ListParkingStationnementsUseCase(
     stationnementRepository: $stationnementsRepository,
-    parkingRepository: $parkingRepository
+    parkingRepository: $parkingRepository,
+    userRepository: $userRepository
 );
 
 $getAvailableSpotsAtTimeUseCase = new GetAvailableSpotsAtTimeUseCase(
@@ -259,7 +261,8 @@ $getMonthlyRevenueUseCase = new GetMonthlyRevenueUseCase(
 $listOverstayingUsersUseCase = new ListOverstayingUsersUseCase(
     parkingRepository: $parkingRepository,
     stationnementRepository: $stationnementsRepository,
-    reservationRepository: $reservationRepository
+    reservationRepository: $reservationRepository,
+    userRepository: $userRepository
 );
 
 // ============================================================================

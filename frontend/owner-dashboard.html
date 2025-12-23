@@ -260,8 +260,12 @@
                 });
 
                 const data = await response.json();
+                console.log('API Response:', data);
+                console.log('Number of parkings:', data.parkings ? data.parkings.length : 0);
+                console.log('Parkings:', data.parkings);
                 displayParkings(data.parkings || []);
             } catch (error) {
+                console.error('Error loading parkings:', error);
                 document.getElementById('parkings-list').innerHTML = '<p>Aucun parking créé pour le moment</p>';
             }
         }
@@ -334,7 +338,7 @@
                         <div class="stat-card">
                             <h4>Chiffre d'affaires mensuel</h4>
                             <p style="font-size: 1.5rem; font-weight: bold; color: #27ae60;">
-                                ${data.revenue || '0.00'}€
+                                ${data.total_revenue || '0.00'}€
                             </p>
                         </div>
                         <div class="stat-card">

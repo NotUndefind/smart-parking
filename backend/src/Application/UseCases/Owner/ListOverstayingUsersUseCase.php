@@ -9,13 +9,15 @@ use App\Domain\Exceptions\ParkingNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 use App\Domain\Repositories\ReservationRepositoryInterface;
 use App\Domain\Repositories\StationnementRepositoryInterface;
+use App\Domain\Repositories\UserRepositoryInterface;
 
 final class ListOverstayingUsersUseCase
 {
     public function __construct(
         private ParkingRepositoryInterface $parkingRepository,
         private StationnementRepositoryInterface $stationnementRepository,
-        private ReservationRepositoryInterface $reservationRepository
+        private ReservationRepositoryInterface $reservationRepository,
+        private UserRepositoryInterface $userRepository
     ) {
     }
 
@@ -63,6 +65,7 @@ final class ListOverstayingUsersUseCase
 
         // 4. Retourner les DTOs Output
         return array_map(function ($stationnement) use ($parking) {
+            $user = $this->userRepository->findById($stationnement->getUserId());
             return new StationnementOutput(
                 id: $stationnement->getId(),
                 parkingId: $stationnement->getParkingId(),
@@ -71,7 +74,8 @@ final class ListOverstayingUsersUseCase
                 exitTime: $stationnement->getExitTime(),
                 finalPrice: $stationnement->getFinalPrice(),
                 penaltyAmount: $stationnement->getPenaltyAmount(),
-                status: $stationnement->getStatus()
+                status: $stationnement->getStatus(),
+                userEmail: $user?->getEmail()
             );
         }, $overstaying);
     }

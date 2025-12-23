@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Application\UseCases\Owner;
 
+use App\Application\DTOs\Output\MonthlyRevenueOutput;
 use App\Domain\Exceptions\ParkingNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 use App\Domain\Repositories\ReservationRepositoryInterface;
@@ -20,7 +21,7 @@ final class GetMonthlyRevenueUseCase
     ) {
     }
 
-    public function execute(string $parkingId, int $year, int $month): float
+    public function execute(string $parkingId, int $year, int $month): MonthlyRevenueOutput
     {
         // 1. Vérifier que le parking existe
         $parking = $this->parkingRepository->findById($parkingId);
@@ -30,28 +31,34 @@ final class GetMonthlyRevenueUseCase
 
         // 2. Calculer le début et la fin du mois
         $startTimestamp = mktime(0, 0, 0, $month, 1, $year);
-        $endTimestamp = mktime(23, 59, 59, $month, date('t', $startTimestamp), $year);
+        $endTimestamp = mktime(23, 59, 59, $month, (int)date('t', $startTimestamp), $year);
 
-        $revenue = 0.0;
+        $reservationsRevenue = 0.0;
+        $stationnementsRevenue = 0.0;
+        $subscriptionsRevenue = 0.0;
+        $penaltiesRevenue = 0.0;
+        $reservationsCount = 0;
 
         // 3. Revenus des réservations complétées
         $reservations = $this->reservationRepository->findByParkingId($parkingId);
         foreach ($reservations as $reservation) {
-            if ($reservation->getStatus() === 'completed' && 
+            if ($reservation->getStatus() === 'completed' &&
                 $reservation->getCreatedAt()->getTimestamp() >= $startTimestamp &&
                 $reservation->getCreatedAt()->getTimestamp() <= $endTimestamp) {
-                $revenue += $reservation->getEstimatedPrice();
+                $reservationsRevenue += $reservation->getEstimatedPrice();
+                $reservationsCount++;
             }
         }
 
         // 4. Revenus des stationnements (prix final + pénalités)
         $stationnements = $this->stationnementRepository->findByParkingId($parkingId);
         foreach ($stationnements as $stationnement) {
-            if ($stationnement->getStatus() === 'completed' && 
+            if ($stationnement->getStatus() === 'completed' &&
                 $stationnement->getExitTime() !== null &&
                 $stationnement->getExitTime() >= $startTimestamp &&
                 $stationnement->getExitTime() <= $endTimestamp) {
-                $revenue += $stationnement->getFinalPrice() + $stationnement->getPenaltyAmount();
+                $stationnementsRevenue += $stationnement->getFinalPrice();
+                $penaltiesRevenue += $stationnement->getPenaltyAmount();
             }
         }
 
@@ -60,11 +67,20 @@ final class GetMonthlyRevenueUseCase
         foreach ($subscriptions as $subscription) {
             if ($subscription->getCreatedAt()->getTimestamp() >= $startTimestamp &&
                 $subscription->getCreatedAt()->getTimestamp() <= $endTimestamp) {
-                $revenue += $subscription->getPrice();
+                $subscriptionsRevenue += $subscription->getPrice();
             }
         }
 
-        return round($revenue, 2);
+        $totalRevenue = $reservationsRevenue + $stationnementsRevenue + $subscriptionsRevenue + $penaltiesRevenue;
+
+        return new MonthlyRevenueOutput(
+            totalRevenue: round($totalRevenue, 2),
+            reservationsRevenue: round($reservationsRevenue, 2),
+            stationnementsRevenue: round($stationnementsRevenue, 2),
+            subscriptionsRevenue: round($subscriptionsRevenue, 2),
+            penaltiesRevenue: round($penaltiesRevenue, 2),
+            reservationsCount: $reservationsCount
+        );
     }
 }
 

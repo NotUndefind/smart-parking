@@ -14,7 +14,8 @@ final class StationnementOutput
         public readonly ?int $exitTime,
         public readonly float $finalPrice,
         public readonly float $penaltyAmount,
-        public readonly string $status
+        public readonly string $status,
+        public readonly ?string $userEmail = null
     ) {
     }
 
@@ -29,6 +30,7 @@ final class StationnementOutput
             'prix_total' => $this->finalPrice,
             'penalite' => $this->penaltyAmount,
             'statut' => $this->status,
+            'user_email' => $this->userEmail,
         ];
     }
 }

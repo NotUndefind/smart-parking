@@ -246,6 +246,10 @@
 
         async function loadCurrentStationnement() {
             try {
+                if (!user || !user.id) {
+                    console.log('User not authenticated, skipping current stationnement load');
+                    return;
+                }
                 const stationnementsResponse = await stationnementAPI.getUserStationnements(user.id);
                 const stationnements = stationnementsResponse.stationnements || [];
                 const currentStationnement = stationnements.find(s => !s.heure_sortie && s.parking_id === parkingId);

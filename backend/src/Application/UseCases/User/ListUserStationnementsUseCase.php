@@ -33,7 +33,8 @@ final class ListUserStationnementsUseCase
                 exitTime: $stationnement->getExitTime(),
                 finalPrice: $stationnement->getFinalPrice(),
                 penaltyAmount: $stationnement->getPenaltyAmount(),
-                status: $stationnement->getStatus()
+                status: $stationnement->getStatus(),
+                userEmail: null
             );
         }, $stationnements);
     }

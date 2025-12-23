@@ -411,14 +411,7 @@ final class OwnerApiController
             $month = (int) ($_GET["month"] ?? date("n"));
             $year = (int) ($_GET["year"] ?? date("Y"));
 
-            $input = GetMonthlyRevenueInput::create(
-                parkingId: $parkingId,
-                ownerId: $ownerId,
-                month: $month,
-                year: $year
-            );
-
-            $output = $this->getMonthlyRevenueUseCase->execute($input);
+            $output = $this->getMonthlyRevenueUseCase->execute($parkingId, $year, $month);
 
             $this->jsonResponse([
                 "success" => true,
@@ -427,8 +420,9 @@ final class OwnerApiController
                 "year" => $year,
                 "total_revenue" => $output->totalRevenue,
                 "reservations_revenue" => $output->reservationsRevenue,
+                "stationnements_revenue" => $output->stationnementsRevenue,
                 "subscriptions_revenue" => $output->subscriptionsRevenue,
-                "penalties_revenue" => $output->penaltiesRevenue ?? 0,
+                "penalties_revenue" => $output->penaltiesRevenue,
                 "reservations_count" => $output->reservationsCount
             ], 200);
 
@@ -448,12 +442,12 @@ final class OwnerApiController
                 return;
             }
 
-            $output = $this->listOverstayingUsersUseCase->execute($parkingId, $ownerId);
+            $overstays = $this->listOverstayingUsersUseCase->execute($parkingId);
 
             $this->jsonResponse([
                 "success" => true,
-                "overstaying_users" => $output->overstayingUsers,
-                "count" => count($output->overstayingUsers)
+                "overstays" => array_map(fn($s) => $s->toArray(), $overstays),
+                "count" => count($overstays)
             ], 200);
 
         } catch (\Exception $e) {
