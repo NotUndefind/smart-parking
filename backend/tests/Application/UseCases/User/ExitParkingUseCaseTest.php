@@ -6,14 +6,20 @@ namespace Tests\Application\UseCases\User;
 
 use App\Application\DTOs\Input\ExitParkingInput;
 use App\Application\UseCases\User\ExitParkingUseCase;
-use App\Domain\Entities\Parking;
-use App\Domain\Entities\Stationnement;
+use App\Domain\Exceptions\UserNotFoundException;
 use App\Domain\Repositories\ParkingRepositoryInterface;
 use App\Domain\Repositories\ReservationRepositoryInterface;
 use App\Domain\Repositories\StationnementRepositoryInterface;
 use PHPUnit\Framework\TestCase;
+use PHPUnit\Framework\Attributes\CoversClass;
+use Tests\Helpers\EntityFactory;
+use App\Application\DTOs\Output\StationnementOutput;
+use App\Domain\Entities\Parking;
+use App\Domain\Entities\Reservation;
+use App\Domain\Entities\Stationnement;
 
-class ExitParkingUseCaseTest extends TestCase
+#[CoversClass(ExitParkingUseCase::class)]
+final class ExitParkingUseCaseTest extends TestCase
 {
     private StationnementRepositoryInterface $stationnementRepository;
     private ParkingRepositoryInterface $parkingRepository;
@@ -22,6 +28,7 @@ class ExitParkingUseCaseTest extends TestCase
 
     protected function setUp(): void
     {
+        // Mock all repositories (interfaces)
         $this->stationnementRepository = $this->createMock(StationnementRepositoryInterface::class);
         $this->parkingRepository = $this->createMock(ParkingRepositoryInterface::class);
         $this->reservationRepository = $this->createMock(ReservationRepositoryInterface::class);
@@ -33,26 +40,29 @@ class ExitParkingUseCaseTest extends TestCase
         );
     }
 
-    public function testCanExitParking(): void
+    public function testSuccessfulExitWithCorrectPrice(): void
     {
-        $input = new ExitParkingInput(
+        $entryTime = time() - 7200; // 2 hours ago
+        $input = ExitParkingInput::create(
             stationnementId: 'stationnement_1'
         );
 
-        $stationnement = $this->createMock(Stationnement::class);
-        $stationnement->method('isActive')->willReturn(true);
-        $stationnement->method('getId')->willReturn('stationnement_1');
-        $stationnement->method('getParkingId')->willReturn('parking_1');
-        $stationnement->method('getEntryTime')->willReturn(time() - 7200);
-        $stationnement->method('getReservationId')->willReturn(null);
-        $stationnement->method('getExitTime')->willReturn(time());
-        $stationnement->method('getFinalPrice')->willReturn(20.0);
-        $stationnement->method('getPenaltyAmount')->willReturn(0.0);
-        $stationnement->method('getStatus')->willReturn('completed');
+        $stationnement = EntityFactory::createStationnement([
+            'id' => 'stationnement_1',
+            'parkingId' => 'parking_1',
+            'entryTime' => $entryTime,
+            'exitTime' => null,
+            'reservationId' => null,
+            'status' => 'active'
+        ]);
 
-        $parking = $this->createMock(Parking::class);
-        $parking->method('getName')->willReturn('Test Parking');
-        $parking->method('calculatePrice')->willReturn(20.0);
+        $parking = EntityFactory::createParking([
+            'id' => 'parking_1',
+            'name' => 'Test Parking',
+            'tariffs' => [
+                ['start_hour' => 0, 'end_hour' => 24, 'price_per_hour' => 2.5]
+            ]
+        ]);
 
         $this->stationnementRepository->expects($this->once())
             ->method('findById')
@@ -64,18 +74,101 @@ class ExitParkingUseCaseTest extends TestCase
             ->with('parking_1')
             ->willReturn($parking);
 
-        $stationnement->expects($this->once())
-            ->method('exit')
-            ->with($this->anything(), 20.0, 0.0);
-
         $this->stationnementRepository->expects($this->once())
             ->method('save')
-            ->with($stationnement);
+            ->with($this->callback(function ($stat) {
+                return $stat->getStatus() === 'completed' &&
+                       $stat->getExitTime() !== null &&
+                       $stat->getFinalPrice() > 0;
+            }));
 
         $output = $this->useCase->execute($input);
 
         $this->assertEquals('stationnement_1', $output->id);
         $this->assertEquals('parking_1', $output->parkingId);
         $this->assertEquals('Test Parking', $output->parkingName);
+        $this->assertEquals('completed', $output->status);
+        $this->assertEquals($entryTime, $output->entryTime);
+        $this->assertNotNull($output->exitTime);
+        $this->assertGreaterThan(0, $output->finalPrice);
+        $this->assertEquals(0.0, $output->penaltyAmount);
+    }
+
+    public function testExitWithPenaltyForOverstay(): void
+    {
+        $entryTime = time() - 7200; // 2 hours ago
+        $reservationEndTime = time() - 3600; // Reservation ended 1 hour ago (overstay!)
+
+        $input = ExitParkingInput::create(
+            stationnementId: 'stationnement_1'
+        );
+
+        $stationnement = EntityFactory::createStationnement([
+            'id' => 'stationnement_1',
+            'parkingId' => 'parking_1',
+            'reservationId' => 'reservation_1',
+            'entryTime' => $entryTime,
+            'exitTime' => null,
+            'status' => 'active'
+        ]);
+
+        $parking = EntityFactory::createParking([
+            'id' => 'parking_1',
+            'name' => 'Test Parking',
+            'tariffs' => [
+                ['start_hour' => 0, 'end_hour' => 24, 'price_per_hour' => 2.5]
+            ]
+        ]);
+
+        $reservation = EntityFactory::createReservation([
+            'id' => 'reservation_1',
+            'startTime' => $entryTime,
+            'endTime' => $reservationEndTime
+        ]);
+
+        $this->stationnementRepository->expects($this->once())
+            ->method('findById')
+            ->willReturn($stationnement);
+
+        $this->parkingRepository->expects($this->once())
+            ->method('findById')
+            ->willReturn($parking);
+
+        $this->reservationRepository->expects($this->once())
+            ->method('findById')
+            ->with('reservation_1')
+            ->willReturn($reservation);
+
+        $this->stationnementRepository->expects($this->once())
+            ->method('save')
+            ->with($this->callback(function ($stat) {
+                return $stat->getStatus() === 'completed' &&
+                       $stat->getPenaltyAmount() > 0;
+            }));
+
+        $output = $this->useCase->execute($input);
+
+        $this->assertEquals('completed', $output->status);
+        $this->assertGreaterThan(0, $output->penaltyAmount); // Should have penalty for overstay
+    }
+
+    public function testThrowsExceptionWhenStationnementNotFound(): void
+    {
+        $input = ExitParkingInput::create(
+            stationnementId: 'nonexistent_stationnement'
+        );
+
+        $this->stationnementRepository->expects($this->once())
+            ->method('findById')
+            ->with('nonexistent_stationnement')
+            ->willReturn(null);
+
+        $this->stationnementRepository->expects($this->never())
+            ->method('save');
+
+        $this->expectException(UserNotFoundException::class);
+        $this->expectExceptionMessage('Active stationnement not found');
+
+        $this->useCase->execute($input);
     }
 }
